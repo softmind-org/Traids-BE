@@ -15,6 +15,8 @@ import { JobApplicationModule } from './job-application/job-application.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { NotificationModule } from './notification/notification.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { TimesheetModule } from './timesheet/timesheet.module';
+import { InvoiceModule } from './invoice/invoice.module';
 
 @Module({
   imports: [
@@ -43,8 +45,11 @@ import { SchedulerModule } from './scheduler/scheduler.module';
     ComplianceModule,
     NotificationModule,
     SchedulerModule,
+    TimesheetModule,
+    InvoiceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule { }
+

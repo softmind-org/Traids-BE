@@ -42,8 +42,12 @@ export class JobApplicationService {
             throw new BadRequestException('This job is no longer accepting applications');
         }
 
-        // 3. Check if job start date hasn't passed
-        if (new Date() > job.timelineStartDate) {
+        // 3. Check if job start date hasn't passed (today is still allowed)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const jobStartDay = new Date(job.timelineStartDate);
+        jobStartDay.setHours(0, 0, 0, 0);
+        if (today > jobStartDay) {
             throw new BadRequestException('Job start date has already passed');
         }
 
@@ -174,17 +178,19 @@ export class JobApplicationService {
         job.status = 'pending' as any;
         await job.save();
 
-        // 6. Auto-reject all other pending applications for this job
-        await this.applicationModel.updateMany(
-            {
-                job: application.job,
-                _id: { $ne: applicationId },
-                status: ApplicationStatus.PENDING,
-            },
-            {
-                status: ApplicationStatus.REJECTED,
-            },
-        );
+        // 6. Auto-reject remaining pending applications ONLY if the job is now fully staffed
+        if (job.assignedTo.length >= job.workersRequired) {
+            await this.applicationModel.updateMany(
+                {
+                    job: application.job,
+                    _id: { $ne: applicationId },
+                    status: ApplicationStatus.PENDING,
+                },
+                {
+                    status: ApplicationStatus.REJECTED,
+                },
+            );
+        }
 
         // 7. Notify accepted subcontractor
         const populatedJob = await this.jobModel.findById(application.job).populate('company', 'companyName').exec();

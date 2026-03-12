@@ -44,5 +44,3 @@ export class JobApplication {
 
 export const JobApplicationSchema = SchemaFactory.createForClass(JobApplication);
 
-// Indexes
-JobApplicationSchema.index({ job: 1 }, { unique: true }); // Prevent duplicate applications

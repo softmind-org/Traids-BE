@@ -10,12 +10,15 @@ import {
     Invoice,
     InvoiceDocument,
     InvoiceStatus,
+    InvoicePaymentStatus,
 } from './schema/invoice.schema';
 import {
     Timesheet,
     TimesheetDocument,
 } from '../timesheet/schema/timesheet.schema';
 import { Job, JobDocument } from '../job/schema/job.schema';
+import { Company, CompanyDocument } from '../company/schema/company.schema';
+import { StripeService } from '../stripe/stripe.service';
 
 @Injectable()
 export class InvoiceService {
@@ -25,6 +28,8 @@ export class InvoiceService {
         @InjectModel(Invoice.name) private invoiceModel: Model<InvoiceDocument>,
         @InjectModel(Timesheet.name) private timesheetModel: Model<TimesheetDocument>,
         @InjectModel(Job.name) private jobModel: Model<JobDocument>,
+        @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
+        private stripeService: StripeService,
     ) { }
 
     // ─────────────────────────────────────────────────────────────
@@ -119,9 +124,7 @@ export class InvoiceService {
         const totalPlatformFee = parseFloat(
             lineItems.reduce((sum, li) => sum + li.platformFee, 0).toFixed(2),
         );
-        const totalAmount = parseFloat(
-            lineItems.reduce((sum, li) => sum + li.netPayable, 0).toFixed(2),
-        );
+        const totalAmount = parseFloat((subtotal + totalPlatformFee).toFixed(2));
 
         const invoiceNumber = await this.generateInvoiceNumber();
 
@@ -242,5 +245,74 @@ export class InvoiceService {
         }
 
         return invoice;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // PAY INVOICE
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Creates a Stripe PaymentIntent for the invoice total.
+     * Returns { clientSecret } for Stripe.js to confirm on the frontend.
+     * The actual payout to subcontractors happens via the polling cron job
+     * once the PaymentIntent status becomes 'succeeded'.
+     */
+    async payInvoice(
+        invoiceId: string,
+        companyId: string,
+    ): Promise<{ clientSecret: string; paymentIntentId: string }> {
+        const invoice = await this.invoiceModel.findById(invoiceId);
+        if (!invoice) {
+            throw new HttpException('Invoice not found', HttpStatus.NOT_FOUND);
+        }
+        if (invoice.company.toString() !== companyId) {
+            throw new HttpException('Access denied', HttpStatus.FORBIDDEN);
+        }
+        if (invoice.status !== InvoiceStatus.FINALIZED) {
+            throw new HttpException(
+                `Invoice cannot be paid. Current status: ${invoice.status}`,
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+        if (invoice.paymentStatus !== InvoicePaymentStatus.UNPAID) {
+            throw new HttpException(
+                `Invoice already has payment status: ${invoice.paymentStatus}`,
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
+        // Load company's Stripe customer + payment method
+        const company = await this.companyModel.findById(companyId);
+        if (!company?.stripeCustomerId || !company?.stripeDefaultPaymentMethodId) {
+            throw new HttpException(
+                'Company does not have a payment method set up. Please add a card first.',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
+        // Convert GBP to pence for Stripe (e.g. £12.50 → 1250)
+        const amountPence = Math.round(invoice.totalAmount * 100);
+
+        const paymentIntent = await this.stripeService.createPaymentIntent(
+            amountPence,
+            company.stripeCustomerId,
+            company.stripeDefaultPaymentMethodId,
+        );
+
+        // Persist PaymentIntent ID and update status
+        await this.invoiceModel.findByIdAndUpdate(invoiceId, {
+            stripePaymentIntentId: paymentIntent.id,
+            status: InvoiceStatus.PENDING_PAYMENT,
+            paymentStatus: InvoicePaymentStatus.PROCESSING,
+        });
+
+        this.logger.log(
+            `PaymentIntent ${paymentIntent.id} created for invoice ${invoice.invoiceNumber} (£${invoice.totalAmount})`,
+        );
+
+        return {
+            clientSecret: paymentIntent.client_secret!,
+            paymentIntentId: paymentIntent.id,
+        };
     }
 }

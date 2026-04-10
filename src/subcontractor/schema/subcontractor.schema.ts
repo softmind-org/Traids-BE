@@ -71,6 +71,13 @@ export class Subcontractor {
 
   @Prop()
   resetTokenExpires?: Date;
+
+  // Stripe Connect
+  @Prop()
+  stripeAccountId?: string;
+
+  @Prop({ default: false })
+  stripeOnboardingComplete: boolean;
 }
 
 export const SubcontractorSchema = SchemaFactory.createForClass(Subcontractor);

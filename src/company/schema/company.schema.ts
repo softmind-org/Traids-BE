@@ -61,6 +61,13 @@ export class Company {
 
   @Prop()
   resetTokenExpires?: Date;
+
+  // Stripe
+  @Prop()
+  stripeCustomerId?: string;
+
+  @Prop()
+  stripeDefaultPaymentMethodId?: string;
 }
 
 export const CompanySchema = SchemaFactory.createForClass(Company);

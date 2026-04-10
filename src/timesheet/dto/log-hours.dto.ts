@@ -1,4 +1,5 @@
-import { IsString, IsDateString, Matches, IsMongoId } from 'class-validator';
+import { IsString, IsDateString, IsOptional, IsInt, Min, Matches, IsMongoId } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class LogHoursDto {
     @IsMongoId()
@@ -18,4 +19,10 @@ export class LogHoursDto {
         message: 'checkOut must be in format HH:MM AM/PM',
     })
     checkOut: string; // "05:00 PM"
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Type(() => Number)
+    weekNumber?: number; // optional — backend calculates if not provided
 }

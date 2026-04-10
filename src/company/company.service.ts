@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { Model } from 'mongoose';
 import { Company, CompanyDocument } from './schema/company.schema';
 import { SignUpCompanyDto } from './dto/signup-company.dto';
 import { S3UploadService } from '../common/service/s3-upload.service';
+import { StripeService } from '../stripe/stripe.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class CompanyService {
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
     private jwtService: JwtService,
     private s3UploadService: S3UploadService,
+    private stripeService: StripeService,
   ) { }
 
   async signUp(
@@ -65,7 +67,23 @@ export class CompanyService {
       healthAndSafetyPolicy: healthAndSafetyPolicyUrl || signUpCompanyDto.healthAndSafetyPolicy,
     });
 
-    return newCompany.save();
+    const saved = await newCompany.save();
+
+    // Silently create Stripe Customer and persist the ID
+    try {
+      const customer = await this.stripeService.createCustomer(
+        signUpCompanyDto.workEmail,
+        signUpCompanyDto.companyName,
+      );
+      await this.companyModel.findByIdAndUpdate(saved._id, {
+        stripeCustomerId: customer.id,
+      });
+    } catch (err) {
+      // Non-fatal: Stripe customer can be created later
+      console.error('Stripe customer creation failed:', err.message);
+    }
+
+    return saved;
   }
 
   async findByEmail(email: string): Promise<Company | null> {
@@ -154,5 +172,71 @@ export class CompanyService {
     }
 
     return updated;
+  }
+
+  // ─── STRIPE PAYMENT METHODS ─────────────────────────────────────
+
+  async createSetupIntent(companyId: string): Promise<{ clientSecret: string }> {
+    const company = await this.companyModel.findById(companyId);
+    if (!company) throw new HttpException('Company not found', HttpStatus.NOT_FOUND);
+
+    // Auto-create Stripe Customer if missing (e.g. existing users before Stripe was added)
+    if (!company.stripeCustomerId) {
+      const customer = await this.stripeService.createCustomer(
+        company.workEmail,
+        company.companyName,
+      );
+      await this.companyModel.findByIdAndUpdate(companyId, {
+        stripeCustomerId: customer.id,
+      });
+      company.stripeCustomerId = customer.id;
+    }
+
+    const intent = await this.stripeService.createSetupIntent(company.stripeCustomerId);
+    return { clientSecret: intent.client_secret! };
+  }
+
+  async savePaymentMethod(
+    companyId: string,
+    paymentMethodId: string,
+  ): Promise<void> {
+    const company = await this.companyModel.findById(companyId);
+    if (!company) throw new HttpException('Company not found', HttpStatus.NOT_FOUND);
+    if (!company.stripeCustomerId) {
+      throw new HttpException(
+        'Stripe customer not set up.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    await this.stripeService.attachPaymentMethod(
+      company.stripeCustomerId,
+      paymentMethodId,
+    );
+    await this.companyModel.findByIdAndUpdate(companyId, {
+      stripeDefaultPaymentMethodId: paymentMethodId,
+    });
+  }
+
+  async getPaymentMethod(companyId: string): Promise<any> {
+    const company = await this.companyModel.findById(companyId);
+    if (!company) throw new HttpException('Company not found', HttpStatus.NOT_FOUND);
+
+    if (!company.stripeDefaultPaymentMethodId) {
+      return null;
+    }
+
+    const pm = await this.stripeService.retrievePaymentMethod(
+      company.stripeDefaultPaymentMethodId,
+    );
+
+    if (!pm || !pm.card) return null;
+
+    return {
+      id: pm.id,
+      brand: pm.card.brand,
+      last4: pm.card.last4,
+      expMonth: pm.card.exp_month,
+      expYear: pm.card.exp_year,
+    };
   }
 }

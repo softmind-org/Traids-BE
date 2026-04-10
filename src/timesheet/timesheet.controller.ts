@@ -84,16 +84,19 @@ export class TimesheetController {
     /**
      * GET /timesheets/my/job/:jobId
      * Get all weekly timesheets for a specific job (subcontractor's own view).
+     * Optional: ?weekNumber=1  →  returns only that specific week's timesheet.
      */
     @Get('my/job/:jobId')
     @UseGuards(JwtAuthGuard, SubcontractorGuard)
     async getMyTimesheetsByJob(
         @Param('jobId') jobId: string,
+        @Query('weekNumber') weekNumber: string,
         @Request() req,
     ) {
         const timesheets = await this.timesheetService.getMyTimesheetsByJob(
             jobId,
             req.user.sub,
+            weekNumber ? parseInt(weekNumber, 10) : undefined,
         );
         return {
             success: true,

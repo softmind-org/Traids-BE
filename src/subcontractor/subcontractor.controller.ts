@@ -4,6 +4,7 @@ import {
   Post,
   Get,
   Put,
+  Param,
   Body,
   Request,
   HttpException,
@@ -12,6 +13,7 @@ import {
   UseInterceptors,
   UseGuards,
   UploadedFiles,
+  HttpCode,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { SubcontractorService } from './subcontractor.service';
@@ -20,6 +22,7 @@ import { OfferService } from '../offer/offer.service';
 import { SignUpSubcontractorDto } from './dto/signup-subcontractor.dto';
 import { UpdateSubcontractorDto } from './dto/update-subcontractor.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SubcontractorGuard } from '../auth/guards/subcontractor.guard';
 
 @Controller('subcontractor')
 export class SubcontractorController {
@@ -162,5 +165,78 @@ export class SubcontractorController {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  // ─── PAYOUT METHOD ─────────────────────────────────
+
+  /**
+   * GET /subcontractor/payout-method
+   * Returns the subcontractor's linked bank account details from Stripe.
+   */
+  @Get('payout-method')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  async getPayoutMethod(@Request() req) {
+    const data = await this.subcontractorService.getPayoutMethod(req.user.sub);
+    return { success: true, data };
+  }
+
+  // ─── WALLET ────────────────────────────────────────
+
+  /**
+   * GET /subcontractor/wallet
+   * Returns the subcontractor's Stripe balance (available + pending)
+   * and a full transaction history of received payments.
+   */
+  @Get('wallet')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  async getWallet(@Request() req) {
+    return this.subcontractorService.getWallet(req.user.sub);
+  }
+
+  // ─── STRIPE CONNECT ────────────────────────────────
+
+  /**
+   * POST /subcontractor/onboarding-link
+   * Returns a Stripe-hosted URL where the subcontractor completes
+   * KYC + bank account setup. The Express account was already created
+   * at signup. Frontend should redirect the user to the returned URL.
+   */
+  @Post('onboarding-link')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  @HttpCode(HttpStatus.OK)
+  async getOnboardingLink(@Request() req) {
+    return this.subcontractorService.getOnboardingLink(req.user.sub);
+  }
+
+  /**
+   * GET /subcontractor/:id/onboarding-status
+   * Returns whether the subcontractor has completed Stripe onboarding.
+   */
+  @Get(':id/onboarding-status')
+  @UseGuards(JwtAuthGuard)
+  async getOnboardingStatus(@Param('id') id: string) {
+    return this.subcontractorService.getOnboardingStatus(id);
+  }
+
+  /**
+   * GET /subcontractor/:id/balance
+   * Returns the subcontractor's available Stripe balance (funds ready to pay out).
+   */
+  @Get(':id/balance')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  async getBalance(@Param('id') id: string) {
+    return this.subcontractorService.getBalance(id);
+  }
+
+  /**
+   * POST /subcontractor/:id/withdraw
+   * Triggers a manual payout of the full available balance to the
+   * subcontractor's bank account registered in Stripe.
+   */
+  @Post(':id/withdraw')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  @HttpCode(HttpStatus.OK)
+  async withdraw(@Param('id') id: string) {
+    return this.subcontractorService.withdraw(id);
   }
 }

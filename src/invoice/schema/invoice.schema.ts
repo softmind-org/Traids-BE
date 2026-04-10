@@ -4,15 +4,18 @@ import { HydratedDocument, Types } from 'mongoose';
 export type InvoiceDocument = HydratedDocument<Invoice>;
 
 export enum InvoiceStatus {
-    DRAFT = 'draft',         // being assembled (not all timesheets approved yet — not used currently)
-    FINALIZED = 'finalized', // all timesheets approved, ready to pay
-    PAID = 'paid',           // payment confirmed
+    DRAFT = 'draft',
+    FINALIZED = 'finalized',       // all timesheets approved, ready to pay
+    PENDING_PAYMENT = 'pending_payment', // PaymentIntent created, waiting confirmation
+    PAID = 'paid',                 // payment confirmed, payouts processed
+    FAILED = 'failed',             // payment failed or canceled
 }
 
 export enum InvoicePaymentStatus {
     UNPAID = 'unpaid',
     PROCESSING = 'processing',
     PAID = 'paid',
+    FAILED = 'failed',
 }
 
 @Schema({ _id: false })
@@ -46,10 +49,14 @@ export class InvoiceLineItem {
 
     // CIS (Construction Industry Scheme) — future ready
     @Prop({ default: 0 })
-    cisRate: number; // e.g. 0.20 = 20%
+    cisRate: number;
 
     @Prop({ default: 0 })
-    cisAmount: number; // grossAmount * cisRate
+    cisAmount: number;
+
+    // Payout tracking
+    @Prop({ default: false })
+    paid: boolean; // true once transfer to this subcontractor is sent
 }
 
 export const InvoiceLineItemSchema = SchemaFactory.createForClass(InvoiceLineItem);
@@ -95,9 +102,16 @@ export class Invoice {
     @Prop()
     paidAt?: Date;
 
+    // Stripe payment tracking
+    @Prop()
+    stripePaymentIntentId?: string;
+
+    @Prop({ default: false })
+    payoutsProcessed: boolean; // true once all subcontractor transfers are done
+
     // Future payment gateway fields — extensible
     @Prop({ type: Object })
-    paymentMetadata?: Record<string, any>; // Stripe charge ID, bank ref, etc.
+    paymentMetadata?: Record<string, any>;
 }
 
 export const InvoiceSchema = SchemaFactory.createForClass(Invoice);

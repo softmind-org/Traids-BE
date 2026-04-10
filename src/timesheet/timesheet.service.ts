@@ -26,7 +26,7 @@ import { LogHoursDto } from './dto/log-hours.dto';
 @Injectable()
 export class TimesheetService {
     private readonly logger = new Logger(TimesheetService.name);
-    private readonly PLATFORM_FEE_PERCENT = 0.1; // 10%
+    private readonly PLATFORM_FEE_PERCENT = 0.05; // 5%
     private readonly REVIEW_WINDOW_HOURS = 18;
 
     constructor(
@@ -138,7 +138,7 @@ export class TimesheetService {
         );
         const grossAmount = parseFloat((totalHours * timesheet.hourlyRate).toFixed(2));
         const platformFee = parseFloat((grossAmount * timesheet.platformFeePercent).toFixed(2));
-        const netPayable = parseFloat((grossAmount - platformFee).toFixed(2));
+        const netPayable = grossAmount; // Worker gets full gross amount
 
         timesheet.totalHours = parseFloat(totalHours.toFixed(2));
         timesheet.grossAmount = grossAmount;
@@ -184,10 +184,10 @@ export class TimesheetService {
             );
         }
 
-        const targetDate = new Date(dto.date);
-        targetDate.setHours(0, 0, 0, 0);
+        // Force strict UTC midnight to avoid local timezone shifts in the database output
+        const targetDate = new Date(`${dto.date}T00:00:00.000Z`);
 
-        const weekNumber = this.getWeekNumber(job.timelineStartDate, targetDate);
+        const weekNumber = dto.weekNumber ?? this.getWeekNumber(job.timelineStartDate, targetDate);
         const weekStartDate = this.getWeekStartDate(job.timelineStartDate, weekNumber);
 
         // Find or create the timesheet for this week
@@ -229,10 +229,11 @@ export class TimesheetService {
         // Calculate hours worked
         const hoursWorked = this.calculateHours(dto.checkIn, dto.checkOut);
 
-        // Check if there's already a log for this date
+        // Check if there's already a log for this date (handles both UTC and local time dates)
         const existingLogIndex = timesheet.dailyLogs.findIndex(
             (log) =>
-                new Date(log.date).toDateString() === targetDate.toDateString(),
+                new Date(log.date).toDateString() === new Date(`${dto.date}T00:00:00.000Z`).toDateString() ||
+                new Date(log.date).toISOString().split('T')[0] === dto.date,
         );
 
         const newLog: DailyLog = {
@@ -253,6 +254,9 @@ export class TimesheetService {
         timesheet.dailyLogs.sort(
             (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
         );
+
+        // Notify Mongoose that the array was modified so it actually saves
+        timesheet.markModified('dailyLogs');
 
         // Recalculate totals
         this.recalculateTotals(timesheet);
@@ -332,16 +336,22 @@ export class TimesheetService {
 
     /**
      * Get timesheets for a specific job (subcontractor's own view).
+     * Optional weekNumber — when provided returns only that week's timesheet.
      */
     async getMyTimesheetsByJob(
         jobId: string,
         subcontractorId: string,
+        weekNumber?: number,
     ): Promise<TimesheetDocument[]> {
+        const filter: any = {
+            job: new Types.ObjectId(jobId),
+            subcontractor: new Types.ObjectId(subcontractorId),
+        };
+        if (weekNumber !== undefined) {
+            filter.weekNumber = weekNumber;
+        }
         return this.timesheetModel
-            .find({
-                job: new Types.ObjectId(jobId),
-                subcontractor: new Types.ObjectId(subcontractorId),
-            })
+            .find(filter)
             .populate('job', 'jobTitle trade siteAddress')
             .sort({ weekNumber: 1 })
             .exec();

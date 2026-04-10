@@ -66,14 +66,14 @@ export class Timesheet {
     @Prop({ default: 0 })
     grossAmount: number; // totalHours * hourlyRate
 
-    @Prop({ default: 0.1 })
-    platformFeePercent: number; // e.g. 0.10 = 10%
+    @Prop({ default: 0.05 })
+    platformFeePercent: number; // e.g. 0.05 = 5%
 
     @Prop({ default: 0 })
-    platformFee: number; // grossAmount * platformFeePercent
+    platformFee: number; // grossAmount * platformFeePercent (charged to company)
 
     @Prop({ default: 0 })
-    netPayable: number; // grossAmount - platformFee
+    netPayable: number; // For subcontractor: equals grossAmount (since fee is paid by company)
 
     @Prop({ required: true, enum: TimesheetStatus, default: TimesheetStatus.DRAFT })
     status: TimesheetStatus;

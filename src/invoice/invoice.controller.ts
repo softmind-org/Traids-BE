@@ -1,10 +1,13 @@
 import {
     Controller,
     Get,
+    Post,
     Param,
     UseGuards,
     Request,
     Query,
+    HttpCode,
+    HttpStatus,
 } from '@nestjs/common';
 import { InvoiceService } from './invoice.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -66,5 +69,19 @@ export class InvoiceController {
             success: true,
             data: invoice,
         };
+    }
+
+    /**
+     * POST /invoices/:id/pay
+     * Creates a Stripe PaymentIntent for the invoice and returns a clientSecret.
+     * The frontend uses Stripe.js to confirm payment with this clientSecret.
+     * Once payment succeeds, the polling cron job processes subcontractor payouts.
+     */
+    @Post(':id/pay')
+    @UseGuards(JwtAuthGuard, AdminGuard)
+    @HttpCode(HttpStatus.OK)
+    async payInvoice(@Param('id') id: string, @Request() req) {
+        const result = await this.invoiceService.payInvoice(id, req.user.sub);
+        return { success: true, ...result };
     }
 }

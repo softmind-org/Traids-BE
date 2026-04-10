@@ -5,6 +5,7 @@ import { Company, CompanySchema } from './schema/company.schema';
 import { CompanyService } from './company.service';
 import { CompanyController } from './company.controller';
 import { CommonModule } from '../common/common.module';
+import { StripeModule } from '../stripe/stripe.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CommonModule } from '../common/common.module';
       signOptions: { expiresIn: '7d' },
     }),
     CommonModule,
+    StripeModule,
   ],
   controllers: [CompanyController],
   providers: [CompanyService],

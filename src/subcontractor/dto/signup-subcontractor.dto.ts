@@ -1,4 +1,5 @@
 import { IsString, IsNotEmpty, IsEmail, IsNumber, IsOptional, IsArray, Min, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class SignUpSubcontractorDto {
   @IsString()
@@ -12,6 +13,7 @@ export class SignUpSubcontractorDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Transform(({ value }) => Number(value))
   yearsOfExperience?: number;
 
   @IsString()
@@ -22,14 +24,24 @@ export class SignUpSubcontractorDto {
   @IsNotEmpty()
   cityLocation: string;
 
+  // Flat URL field(s) from upload-document endpoint
   @IsOptional()
-  insurance?: { documents: string[]; expiresAt?: Date };
+  insuranceDocuments?: string | string[];
 
   @IsOptional()
-  tickets?: { documents: string[]; expiresAt?: Date };
+  insurance?: { expiresAt?: string };
 
   @IsOptional()
-  certification?: { documents: string[]; expiresAt?: Date };
+  ticketsDocuments?: string | string[];
+
+  @IsOptional()
+  tickets?: { expiresAt?: string };
+
+  @IsOptional()
+  certificationDocuments?: string | string[];
+
+  @IsOptional()
+  certification?: { expiresAt?: string };
 
   @IsOptional()
   @IsString()
@@ -38,6 +50,7 @@ export class SignUpSubcontractorDto {
   @IsNumber()
   @IsNotEmpty()
   @Min(0)
+  @Transform(({ value }) => Number(value))
   hourlyRate: number;
 
   @IsString()

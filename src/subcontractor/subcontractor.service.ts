@@ -6,6 +6,7 @@ import { Subcontractor, SubcontractorDocument } from './schema/subcontractor.sch
 import { Invoice, InvoiceDocument } from '../invoice/schema/invoice.schema';
 import { SignUpSubcontractorDto } from './dto/signup-subcontractor.dto';
 import { S3UploadService } from '../common/service/s3-upload.service';
+import { OpenAiService } from '../common/service/openai.service';
 import { StripeService } from '../stripe/stripe.service';
 import * as bcrypt from 'bcrypt';
 
@@ -18,70 +19,44 @@ export class SubcontractorService {
     private invoiceModel: Model<InvoiceDocument>,
     private jwtService: JwtService,
     private s3UploadService: S3UploadService,
+    private openAiService: OpenAiService,
     private stripeService: StripeService,
   ) { }
+
+  async uploadDocumentWithExpiry(
+    file: Express.Multer.File,
+    documentType: 'insurance' | 'tickets' | 'certification',
+  ): Promise<{ url: string; expiresAt: string | null }> {
+    const folderMap = {
+      insurance: 'subcontractors/insurance',
+      tickets: 'subcontractors/tickets',
+      certification: 'subcontractors/certification',
+    };
+
+    // Upload file to S3
+    const url = await this.s3UploadService.uploadFile(file, folderMap[documentType]);
+
+    // Convert buffer to base64 for OpenAI vision
+    const base64 = file.buffer.toString('base64');
+    const expiresAt = await this.openAiService.extractExpiryDate(base64, file.mimetype);
+
+    return { url, expiresAt };
+  }
 
   async signUp(
     signUpSubcontractorDto: SignUpSubcontractorDto,
     files?: {
-      insuranceDocuments?: Express.Multer.File[];
-      ticketsDocuments?: Express.Multer.File[];
-      certificationDocuments?: Express.Multer.File[];
       profileImage?: Express.Multer.File[];
       workExamples?: Express.Multer.File[];
     },
   ): Promise<Subcontractor> {
-    // Hash the password before saving
-    const hashedPassword = await bcrypt.hash(
-      signUpSubcontractorDto.password,
-      10,
-    );
+    const hashedPassword = await bcrypt.hash(signUpSubcontractorDto.password, 10);
 
-    // Upload files to S3 and get URLs
-    let insuranceData: { documents: string[]; expiresAt: any } = { documents: [], expiresAt: null };
-    let ticketsData: { documents: string[]; expiresAt: any } = { documents: [], expiresAt: null };
-    let certificationData: { documents: string[]; expiresAt: any } = { documents: [], expiresAt: null };
     let profileImageUrl: string | undefined;
     let workExamplesUrls: string[] = [];
 
     if (files) {
-      // Upload insurance documents
-      if (files.insuranceDocuments?.length) {
-        const insuranceUrls = await this.s3UploadService.uploadMultipleFiles(
-          files.insuranceDocuments,
-          'subcontractors/insurance',
-        );
-        insuranceData = {
-          documents: insuranceUrls,
-          expiresAt: signUpSubcontractorDto.insurance?.expiresAt || null,
-        };
-      }
-
-      // Upload tickets documents
-      if (files.ticketsDocuments?.length) {
-        const ticketsUrls = await this.s3UploadService.uploadMultipleFiles(
-          files.ticketsDocuments,
-          'subcontractors/tickets',
-        );
-        ticketsData = {
-          documents: ticketsUrls,
-          expiresAt: signUpSubcontractorDto.tickets?.expiresAt || null,
-        };
-      }
-
-      // Upload certification documents
-      if (files.certificationDocuments?.length) {
-        const certificationUrls = await this.s3UploadService.uploadMultipleFiles(
-          files.certificationDocuments,
-          'subcontractors/certification',
-        );
-        certificationData = {
-          documents: certificationUrls,
-          expiresAt: signUpSubcontractorDto.certification?.expiresAt || null,
-        };
-      }
-
-      // Upload profile image
+      // Upload profile image to S3
       if (files.profileImage?.length) {
         profileImageUrl = await this.s3UploadService.uploadFile(
           files.profileImage[0],
@@ -89,7 +64,7 @@ export class SubcontractorService {
         );
       }
 
-      // Upload work examples
+      // Upload work examples to S3
       if (files.workExamples?.length) {
         workExamplesUrls = await this.s3UploadService.uploadMultipleFiles(
           files.workExamples,
@@ -98,12 +73,27 @@ export class SubcontractorService {
       }
     }
 
+    // Helper: normalize flat URL field to array
+    const toArray = (val?: string | string[]): string[] => {
+      if (!val) return [];
+      return Array.isArray(val) ? val : [val];
+    };
+
     const newSubcontractor = new this.subcontractorModel({
       ...signUpSubcontractorDto,
       password: hashedPassword,
-      insurance: insuranceData,
-      tickets: ticketsData,
-      certification: certificationData,
+      insurance: {
+        documents: toArray(signUpSubcontractorDto.insuranceDocuments),
+        expiresAt: signUpSubcontractorDto.insurance?.expiresAt || null,
+      },
+      tickets: {
+        documents: toArray(signUpSubcontractorDto.ticketsDocuments),
+        expiresAt: signUpSubcontractorDto.tickets?.expiresAt || null,
+      },
+      certification: {
+        documents: toArray(signUpSubcontractorDto.certificationDocuments),
+        expiresAt: signUpSubcontractorDto.certification?.expiresAt || null,
+      },
       profileImage: profileImageUrl || signUpSubcontractorDto.profileImage,
       workExamples: workExamplesUrls.length > 0 ? workExamplesUrls : signUpSubcontractorDto.workExamples,
     });

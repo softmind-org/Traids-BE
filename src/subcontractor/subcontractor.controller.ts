@@ -34,12 +34,37 @@ export class SubcontractorController {
     private readonly offerService: OfferService,
   ) { }
 
+  /**
+   * POST /subcontractor/upload-document
+   * Public — called before signup. Uploads a single document to S3
+   * and uses OpenAI vision to extract the expiry date.
+   * Returns { url, expiresAt } to be passed into the signup payload.
+   */
+  @Post('upload-document')
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'file', maxCount: 1 }]))
+  async uploadDocument(
+    @Body('documentType') documentType: 'insurance' | 'tickets' | 'certification',
+    @UploadedFiles() files: { file?: Express.Multer.File[] },
+  ) {
+    if (!files?.file?.length) {
+      throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
+    }
+    if (!['insurance', 'tickets', 'certification'].includes(documentType)) {
+      throw new HttpException(
+        'documentType must be one of: insurance, tickets, certification',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const result = await this.subcontractorService.uploadDocumentWithExpiry(
+      files.file[0],
+      documentType,
+    );
+    return { success: true, ...result };
+  }
+
   @Post('signup')
   @UseInterceptors(
     FileFieldsInterceptor([
-      { name: 'insuranceDocuments', maxCount: 5 },
-      { name: 'ticketsDocuments', maxCount: 5 },
-      { name: 'certificationDocuments', maxCount: 5 },
       { name: 'profileImage', maxCount: 1 },
       { name: 'workExamples', maxCount: 10 },
     ]),
@@ -48,9 +73,6 @@ export class SubcontractorController {
     @Body() signUpSubcontractorDto: SignUpSubcontractorDto,
     @UploadedFiles()
     files: {
-      insuranceDocuments?: Express.Multer.File[];
-      ticketsDocuments?: Express.Multer.File[];
-      certificationDocuments?: Express.Multer.File[];
       profileImage?: Express.Multer.File[];
       workExamples?: Express.Multer.File[];
     },

@@ -17,6 +17,7 @@ import { NotificationModule } from './notification/notification.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { TimesheetModule } from './timesheet/timesheet.module';
 import { InvoiceModule } from './invoice/invoice.module';
+import { HmrcModule } from './hmrc/hmrc.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { InvoiceModule } from './invoice/invoice.module';
     SchedulerModule,
     TimesheetModule,
     InvoiceModule,
+    HmrcModule,
   ],
   controllers: [AppController],
   providers: [AppService],

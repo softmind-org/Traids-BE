@@ -239,4 +239,23 @@ export class CompanyService {
       expYear: pm.card.exp_year,
     };
   }
+
+  async updateHmrcSettings(
+    companyId: string,
+    settings: { utr?: string; employerReference?: string },
+  ): Promise<{ utr: string | null; employerReference: string | null }> {
+    const company = await this.companyModel.findById(companyId);
+    if (!company) throw new HttpException('Company not found', HttpStatus.NOT_FOUND);
+
+    const update: any = {};
+    if (settings.utr !== undefined) update.utr = settings.utr;
+    if (settings.employerReference !== undefined) update.employerReference = settings.employerReference;
+
+    await this.companyModel.findByIdAndUpdate(companyId, update);
+
+    return {
+      utr: update.utr ?? company.utr ?? null,
+      employerReference: update.employerReference ?? company.employerReference ?? null,
+    };
+  }
 }

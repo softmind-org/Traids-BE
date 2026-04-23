@@ -73,6 +73,9 @@ export class SubcontractorService {
       }
     }
 
+    // CIS deduction defaults to 30% — admin verifies manually via HMRC dashboard
+    const cisDeductionRate = 30;
+
     // Helper: normalize flat URL field to array
     const toArray = (val?: string | string[]): string[] => {
       if (!val) return [];
@@ -96,6 +99,9 @@ export class SubcontractorService {
       },
       profileImage: profileImageUrl || signUpSubcontractorDto.profileImage,
       workExamples: workExamplesUrls.length > 0 ? workExamplesUrls : signUpSubcontractorDto.workExamples,
+      utr: signUpSubcontractorDto.utr,
+      nino: signUpSubcontractorDto.nino,
+      cisDeductionRate,
     });
 
     const saved = await newSubcontractor.save();

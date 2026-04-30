@@ -78,6 +78,29 @@ export class Subcontractor {
 
   @Prop({ default: false })
   stripeOnboardingComplete: boolean;
+
+  // HMRC / CIS
+  @Prop()
+  utr?: string;                       // Unique Taxpayer Reference (10 digits)
+
+  @Prop()
+  nino?: string;                      // National Insurance Number (e.g. PE938808A)
+
+  @Prop({ enum: [20, 30], default: 20 })
+  cisDeductionRate: number;           // 20 = registered (HMRC connected), 30 = unregistered
+
+  // HMRC OAuth
+  @Prop({ default: false })
+  hmrcConnected: boolean;
+
+  @Prop()
+  hmrcAccessToken?: string;
+
+  @Prop()
+  hmrcRefreshToken?: string;
+
+  @Prop()
+  hmrcTokenExpiry?: Date;
 }
 
 export const SubcontractorSchema = SchemaFactory.createForClass(Subcontractor);

@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Put,
+  Patch,
   Body,
   Request,
   HttpException,
@@ -152,5 +153,19 @@ export class CompanyController {
   async getPaymentMethod(@Request() req) {
     const paymentMethod = await this.companyService.getPaymentMethod(req.user.sub);
     return { success: true, data: paymentMethod };
+  }
+
+  /**
+   * PATCH /company/hmrc-settings
+   * Saves the company's UTR and Employer Reference needed for CIS verification.
+   */
+  @Patch('hmrc-settings')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async updateHmrcSettings(
+    @Request() req: { user: { sub: string } },
+    @Body() body: { utr?: string; employerReference?: string },
+  ) {
+    const result = await this.companyService.updateHmrcSettings(req.user.sub, body);
+    return { success: true, data: result };
   }
 }

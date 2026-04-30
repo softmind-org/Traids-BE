@@ -70,4 +70,12 @@ export class SignUpSubcontractorDto {
   @IsArray()
   @IsString({ each: true })
   workExamples?: string[];
+
+  @IsOptional()
+  @IsString()
+  utr?: string;                 // HMRC Unique Taxpayer Reference (10 digits)
+
+  @IsOptional()
+  @IsString()
+  nino?: string;                // National Insurance Number (e.g. PE938808A)
 }

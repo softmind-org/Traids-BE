@@ -68,6 +68,25 @@ export class Company {
 
   @Prop()
   stripeDefaultPaymentMethodId?: string;
+
+  // HMRC / CIS
+  @Prop()
+  utr?: string;                     // Company Unique Taxpayer Reference (10 digits)
+
+  @Prop()
+  employerReference?: string;       // PAYE employer reference (e.g. 123/AB456)
+
+  @Prop({ default: false })
+  hmrcConnected: boolean;
+
+  @Prop()
+  hmrcAccessToken?: string;
+
+  @Prop()
+  hmrcRefreshToken?: string;
+
+  @Prop()
+  hmrcTokenExpiry?: Date;           // When the access token expires
 }
 
 export const CompanySchema = SchemaFactory.createForClass(Company);

@@ -12,6 +12,7 @@ import { CommonModule } from '../common/common.module';
 import { JobModule } from '../job/job.module';
 import { OfferModule } from '../offer/offer.module';
 import { StripeModule } from '../stripe/stripe.module';
+import { HmrcModule } from '../hmrc/hmrc.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { StripeModule } from '../stripe/stripe.module';
     JobModule,
     OfferModule,
     StripeModule,
+    HmrcModule,
   ],
   controllers: [SubcontractorController, CompanySubcontractorController],
   providers: [SubcontractorService, CompanySubcontractorService],

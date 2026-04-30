@@ -22,6 +22,7 @@ import { RespondToApplicationDto } from './dto/respond-to-application.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { SubcontractorGuard } from '../auth/guards/subcontractor.guard';
+import { HmrcSubcontractorGuard } from '../auth/guards/hmrc-subcontractor.guard';
 
 @Controller('job-applications')
 export class JobApplicationController {
@@ -30,7 +31,7 @@ export class JobApplicationController {
     // ==================== SUBCONTRACTOR ENDPOINTS ====================
 
     @Post()
-    @UseGuards(JwtAuthGuard, SubcontractorGuard)
+    @UseGuards(JwtAuthGuard, SubcontractorGuard, HmrcSubcontractorGuard)
     @HttpCode(HttpStatus.CREATED)
     @UseInterceptors(FilesInterceptor('documents', 5)) // Max 5 files
     async applyForJob(

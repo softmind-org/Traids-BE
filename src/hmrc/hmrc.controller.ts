@@ -13,12 +13,13 @@ import express from 'express';
 import { HmrcService } from './hmrc.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { SubcontractorGuard } from '../auth/guards/subcontractor.guard';
 
 @Controller('hmrc')
 export class HmrcController {
   constructor(private readonly hmrcService: HmrcService) { }
 
-  // ─── CONNECT ─────────────────────────────────────────────────────
+  // ─── COMPANY: CONNECT ────────────────────────────────────────────
 
   @Get('connect/company')
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -27,7 +28,16 @@ export class HmrcController {
     return { url };
   }
 
-  // ─── CALLBACK ────────────────────────────────────────────────────
+  // ─── SUBCONTRACTOR: CONNECT ──────────────────────────────────────
+
+  @Get('connect/subcontractor')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  connectSubcontractor(@Request() req) {
+    const url = this.hmrcService.getSubcontractorAuthorizationUrl(req.user.sub);
+    return { url };
+  }
+
+  // ─── CALLBACK (shared for company and subcontractor) ─────────────
 
   @Get('callback')
   async callback(
@@ -50,15 +60,49 @@ export class HmrcController {
     }
   }
 
-  // ─── STATUS ──────────────────────────────────────────────────────
+  // ─── COMPANY: STATUS ─────────────────────────────────────────────
+
+  @Get('status/company')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  getCompanyStatus(@Request() req) {
+    return this.hmrcService.getCompanyConnectionStatus(req.user.sub);
+  }
+
+  // ─── SUBCONTRACTOR: STATUS ───────────────────────────────────────
+
+  @Get('status/subcontractor')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  getSubcontractorStatus(@Request() req) {
+    return this.hmrcService.getSubcontractorConnectionStatus(req.user.sub);
+  }
+
+  // ─── COMPANY: DISCONNECT ─────────────────────────────────────────
+
+  @Delete('disconnect/company')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  async disconnectCompany(@Request() req) {
+    await this.hmrcService.disconnectCompany(req.user.sub);
+    return { message: 'HMRC account disconnected' };
+  }
+
+  // ─── SUBCONTRACTOR: DISCONNECT ───────────────────────────────────
+
+  @Delete('disconnect/subcontractor')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  @HttpCode(HttpStatus.OK)
+  async disconnectSubcontractor(@Request() req) {
+    await this.hmrcService.disconnectSubcontractor(req.user.sub);
+    return { message: 'HMRC account disconnected' };
+  }
+
+  // ─── LEGACY: keep /hmrc/status and /hmrc/disconnect pointing to company ──
 
   @Get('status')
   @UseGuards(JwtAuthGuard, AdminGuard)
   getStatus(@Request() req) {
     return this.hmrcService.getCompanyConnectionStatus(req.user.sub);
   }
-
-  // ─── DISCONNECT ──────────────────────────────────────────────────
 
   @Delete('disconnect')
   @UseGuards(JwtAuthGuard, AdminGuard)

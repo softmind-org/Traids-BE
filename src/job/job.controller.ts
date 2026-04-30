@@ -22,6 +22,7 @@ import { FilterJobsDto } from './dto/filter-jobs.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { SubcontractorGuard } from '../auth/guards/subcontractor.guard';
+import { HmrcCompanyGuard } from '../auth/guards/hmrc-company.guard';
 import { JobApplicationService } from '../job-application/job-application.service';
 import { JobApplication } from '../job-application/schema/job-application.schema';
 import { OfferService } from '../offer/offer.service';
@@ -37,7 +38,7 @@ export class JobController {
   ) { }
 
   @Post()
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard, HmrcCompanyGuard)
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FilesInterceptor('documents', 10))
   async createJob(

@@ -47,12 +47,12 @@ export class InvoiceLineItem {
     @Prop({ required: true })
     netPayable: number; // grossAmount - platformFee
 
-    // CIS (Construction Industry Scheme) — future ready
-    @Prop({ default: 0 })
-    cisRate: number;
+    // CIS (Construction Industry Scheme)
+    @Prop({ enum: [20, 30], default: 30 })
+    cisDeductionRate: number;           // snapshot of subcontractor's rate at invoice time
 
     @Prop({ default: 0 })
-    cisAmount: number;
+    cisDeduction: number;               // grossAmount * cisDeductionRate / 100
 
     // Payout tracking
     @Prop({ default: false })
@@ -88,7 +88,10 @@ export class Invoice {
     totalPlatformFee: number; // sum of all lineItems.platformFee
 
     @Prop({ required: true, default: 0 })
-    totalAmount: number; // sum of all lineItems.netPayable
+    totalCisDeduction: number;  // sum of all lineItems.cisDeduction — held by company for HMRC
+
+    @Prop({ required: true, default: 0 })
+    totalAmount: number; // sum of all lineItems.netPayable (what company pays out)
 
     @Prop({ required: true, enum: InvoiceStatus, default: InvoiceStatus.FINALIZED })
     status: InvoiceStatus;

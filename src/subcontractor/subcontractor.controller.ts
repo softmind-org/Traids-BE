@@ -21,6 +21,7 @@ import { JobService } from '../job/job.service';
 import { OfferService } from '../offer/offer.service';
 import { SignUpSubcontractorDto } from './dto/signup-subcontractor.dto';
 import { UpdateSubcontractorDto } from './dto/update-subcontractor.dto';
+import { WithdrawDto } from './dto/withdraw.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SubcontractorGuard } from '../auth/guards/subcontractor.guard';
 
@@ -252,13 +253,13 @@ export class SubcontractorController {
 
   /**
    * POST /subcontractor/:id/withdraw
-   * Triggers a manual payout of the full available balance to the
+   * Triggers a manual payout of the specified amount to the
    * subcontractor's bank account registered in Stripe.
    */
   @Post(':id/withdraw')
   @UseGuards(JwtAuthGuard, SubcontractorGuard)
   @HttpCode(HttpStatus.OK)
-  async withdraw(@Param('id') id: string) {
-    return this.subcontractorService.withdraw(id);
+  async withdraw(@Param('id') id: string, @Body() body: WithdrawDto) {
+    return this.subcontractorService.withdraw(id, body.amount);
   }
 }

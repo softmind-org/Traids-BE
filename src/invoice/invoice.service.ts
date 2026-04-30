@@ -83,7 +83,7 @@ export class InvoiceService {
                 weekNumber,
                 status: 'approved',
             })
-            .populate('subcontractor', 'fullName email')
+            .populate('subcontractor', 'fullName email cisDeductionRate')
             .exec();
 
         if (approvedTimesheets.length === 0) {
@@ -102,6 +102,10 @@ export class InvoiceService {
         // Build line items from approved timesheets
         const lineItems = approvedTimesheets.map((ts) => {
             const sub = ts.subcontractor as any;
+            const cisDeductionRate: number = sub?.cisDeductionRate ?? 30;
+            const cisDeduction = parseFloat((ts.grossAmount * cisDeductionRate / 100).toFixed(2));
+            const netPayable = parseFloat((ts.grossAmount - cisDeduction).toFixed(2)); // platform fee paid by company separately
+
             return {
                 subcontractor: ts.subcontractor,
                 timesheet: ts._id,
@@ -111,9 +115,9 @@ export class InvoiceService {
                 grossAmount: ts.grossAmount,
                 platformFeePercent: ts.platformFeePercent,
                 platformFee: ts.platformFee,
-                netPayable: ts.netPayable,
-                cisRate: 0,     // CIS: future — set per-worker when implemented
-                cisAmount: 0,
+                cisDeductionRate,
+                cisDeduction,
+                netPayable,
             };
         });
 
@@ -124,7 +128,12 @@ export class InvoiceService {
         const totalPlatformFee = parseFloat(
             lineItems.reduce((sum, li) => sum + li.platformFee, 0).toFixed(2),
         );
-        const totalAmount = parseFloat((subtotal + totalPlatformFee).toFixed(2));
+        const totalCisDeduction = parseFloat(
+            lineItems.reduce((sum, li) => sum + li.cisDeduction, 0).toFixed(2),
+        );
+        const totalAmount = parseFloat(
+            lineItems.reduce((sum, li) => sum + li.netPayable, 0).toFixed(2),
+        );
 
         const invoiceNumber = await this.generateInvoiceNumber();
 
@@ -141,6 +150,7 @@ export class InvoiceService {
             lineItems,
             subtotal,
             totalPlatformFee,
+            totalCisDeduction,
             totalAmount,
             status: InvoiceStatus.FINALIZED,
             dueDate,

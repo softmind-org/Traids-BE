@@ -86,11 +86,21 @@ export class Subcontractor {
   @Prop()
   nino?: string;                      // National Insurance Number (e.g. PE938808A)
 
-  @Prop({ default: false })
-  cisRegistered: boolean;             // Set by admin after verifying on HMRC dashboard
+  @Prop({ enum: [20, 30], default: 20 })
+  cisDeductionRate: number;           // 20 = registered (HMRC connected), 30 = unregistered
 
-  @Prop({ enum: [20, 30], default: 30 })
-  cisDeductionRate: number;           // 20 = registered, 30 = unregistered
+  // HMRC OAuth
+  @Prop({ default: false })
+  hmrcConnected: boolean;
+
+  @Prop()
+  hmrcAccessToken?: string;
+
+  @Prop()
+  hmrcRefreshToken?: string;
+
+  @Prop()
+  hmrcTokenExpiry?: Date;
 }
 
 export const SubcontractorSchema = SchemaFactory.createForClass(Subcontractor);

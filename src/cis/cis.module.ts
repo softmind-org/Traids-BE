@@ -2,10 +2,13 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HttpModule } from '@nestjs/axios';
 import { JwtModule } from '@nestjs/jwt';
-import { HmrcService } from './hmrc.service';
-import { HmrcController } from './hmrc.controller';
+import { CisReturn, CisReturnSchema } from './schema/cis-return.schema';
+import { Invoice, InvoiceSchema } from '../invoice/schema/invoice.schema';
 import { Company, CompanySchema } from '../company/schema/company.schema';
 import { Subcontractor, SubcontractorSchema } from '../subcontractor/schema/subcontractor.schema';
+import { CisReturnService } from './cis-return.service';
+import { CisReturnController } from './cis-return.controller';
+import { HmrcModule } from '../hmrc/hmrc.module';
 
 @Module({
   imports: [
@@ -15,12 +18,15 @@ import { Subcontractor, SubcontractorSchema } from '../subcontractor/schema/subc
       signOptions: { expiresIn: '7d' },
     }),
     MongooseModule.forFeature([
+      { name: CisReturn.name, schema: CisReturnSchema },
+      { name: Invoice.name, schema: InvoiceSchema },
       { name: Company.name, schema: CompanySchema },
       { name: Subcontractor.name, schema: SubcontractorSchema },
     ]),
+    HmrcModule,
   ],
-  controllers: [HmrcController],
-  providers: [HmrcService],
-  exports: [HmrcService],
+  controllers: [CisReturnController],
+  providers: [CisReturnService],
+  exports: [CisReturnService],
 })
-export class HmrcModule {}
+export class CisModule {}

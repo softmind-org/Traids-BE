@@ -5,6 +5,7 @@ import { JobApplicationService } from './job-application.service';
 import { JobApplication, JobApplicationSchema } from './schema/job-application.schema';
 import { Job, JobSchema } from '../job/schema/job.schema';
 import { Subcontractor, SubcontractorSchema } from '../subcontractor/schema/subcontractor.schema';
+import { HmrcSubcontractorGuard } from '../auth/guards/hmrc-subcontractor.guard';
 import { SocketModule } from '../socket/socket.module';
 import { JwtModule } from '@nestjs/jwt';
 import { CommonModule } from '../common/common.module';
@@ -24,7 +25,7 @@ import { CommonModule } from '../common/common.module';
         CommonModule,
     ],
     controllers: [JobApplicationController],
-    providers: [JobApplicationService],
+    providers: [JobApplicationService, HmrcSubcontractorGuard],
     exports: [JobApplicationService],
 })
 export class JobApplicationModule { }

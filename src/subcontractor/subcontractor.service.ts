@@ -381,7 +381,7 @@ export class SubcontractorService {
     return { available, pending, transactions };
   }
 
-  async withdraw(subcontractorId: string): Promise<any> {
+  async withdraw(subcontractorId: string, amountGBP: number): Promise<any> {
     const sub = await this.subcontractorModel.findById(subcontractorId);
     if (!sub) throw new HttpException('Subcontractor not found', HttpStatus.NOT_FOUND);
     if (!sub.stripeAccountId || !sub.stripeOnboardingComplete) {
@@ -395,10 +395,17 @@ export class SubcontractorService {
     if (!available || available.amount <= 0) {
       throw new HttpException('No available balance to withdraw', HttpStatus.BAD_REQUEST);
     }
+    const amountInPence = Math.round(amountGBP * 100);
+    if (amountInPence > available.amount) {
+      throw new HttpException(
+        `Requested amount £${amountGBP} exceeds available balance £${available.amount / 100}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     const payout = await this.stripeService.createPayout(
-      available.amount,
+      amountInPence,
       sub.stripeAccountId,
     );
-    return { payoutId: payout.id, amount: available.amount / 100, currency: 'GBP' };
+    return { payoutId: payout.id, amount: amountGBP, currency: 'GBP' };
   }
 }

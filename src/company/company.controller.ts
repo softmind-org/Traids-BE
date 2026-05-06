@@ -148,6 +148,13 @@ export class CompanyController {
    * GET /company/payment-method
    * Retrieves the saved card details (brand, last4, exp date) for the UI.
    */
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async getDashboard(@Request() req) {
+    const data = await this.companyService.getDashboardStats(req.user.sub);
+    return { success: true, data };
+  }
+
   @Get('payment-method')
   @UseGuards(JwtAuthGuard, AdminGuard)
   async getPaymentMethod(@Request() req) {

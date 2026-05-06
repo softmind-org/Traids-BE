@@ -1,8 +1,11 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { JwtService } from '@nestjs/jwt';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Company, CompanyDocument } from './schema/company.schema';
+import { Job, JobDocument, Status } from '../job/schema/job.schema';
+import { Timesheet, TimesheetDocument, TimesheetStatus } from '../timesheet/schema/timesheet.schema';
+import { Invoice, InvoiceDocument, InvoicePaymentStatus } from '../invoice/schema/invoice.schema';
 import { SignUpCompanyDto } from './dto/signup-company.dto';
 import { S3UploadService } from '../common/service/s3-upload.service';
 import { StripeService } from '../stripe/stripe.service';
@@ -12,6 +15,9 @@ import * as bcrypt from 'bcrypt';
 export class CompanyService {
   constructor(
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
+    @InjectModel(Job.name) private jobModel: Model<JobDocument>,
+    @InjectModel(Timesheet.name) private timesheetModel: Model<TimesheetDocument>,
+    @InjectModel(Invoice.name) private invoiceModel: Model<InvoiceDocument>,
     private jwtService: JwtService,
     private s3UploadService: S3UploadService,
     private stripeService: StripeService,
@@ -256,6 +262,154 @@ export class CompanyService {
     return {
       utr: update.utr ?? company.utr ?? null,
       employerReference: update.employerReference ?? company.employerReference ?? null,
+    };
+  }
+
+  // ─── DASHBOARD STATS ─────────────────────────────────────────────
+
+  async getDashboardStats(companyId: string) {
+    const companyObjId = new Types.ObjectId(companyId);
+    const now = new Date();
+
+    // Current month boundaries
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    // Previous month boundaries
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const activeStatuses = [Status.ACCEPTED, Status.IN_PROGRESS];
+
+    // ── 1. Active Jobs ───────────────────────────────────────────
+    const activeJobs = await this.jobModel.countDocuments({
+      company: companyObjId,
+      status: { $in: activeStatuses },
+    });
+
+    const prevActiveJobs = await this.jobModel.countDocuments({
+      company: companyObjId,
+      status: { $in: activeStatuses },
+      createdAt: { $lte: prevMonthEnd },
+    });
+
+    // ── 2. Subs Booked (unique subcontractors on active jobs) ────
+    const activeJobDocs = await this.jobModel
+      .find({ company: companyObjId, status: { $in: activeStatuses } })
+      .select('assignedTo')
+      .lean();
+
+    const subsBooked = new Set(
+      activeJobDocs.flatMap((j) => j.assignedTo.map((id) => id.toString())),
+    ).size;
+
+    const prevActiveJobDocs = await this.jobModel
+      .find({
+        company: companyObjId,
+        status: { $in: activeStatuses },
+        createdAt: { $lte: prevMonthEnd },
+      })
+      .select('assignedTo')
+      .lean();
+
+    const prevSubsBooked = new Set(
+      prevActiveJobDocs.flatMap((j) => j.assignedTo.map((id) => id.toString())),
+    ).size;
+
+    // ── 3. Pending Approvals (timesheets awaiting approval) ──────
+    const pendingApprovals = await this.timesheetModel.countDocuments({
+      company: companyObjId,
+      status: TimesheetStatus.SUBMITTED,
+    });
+
+    const prevPendingApprovals = await this.timesheetModel.countDocuments({
+      company: companyObjId,
+      status: TimesheetStatus.SUBMITTED,
+      submittedAt: { $gte: prevMonthStart, $lte: prevMonthEnd },
+    });
+
+    // ── 4. Monthly Spend (paid invoices this month) ──────────────
+    const spendAgg = await this.invoiceModel.aggregate([
+      {
+        $match: {
+          company: companyObjId,
+          paymentStatus: InvoicePaymentStatus.PAID,
+          paidAt: { $gte: currentMonthStart, $lte: currentMonthEnd },
+        },
+      },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+    ]);
+    const monthlySpend = parseFloat((spendAgg[0]?.total ?? 0).toFixed(2));
+
+    const prevSpendAgg = await this.invoiceModel.aggregate([
+      {
+        $match: {
+          company: companyObjId,
+          paymentStatus: InvoicePaymentStatus.PAID,
+          paidAt: { $gte: prevMonthStart, $lte: prevMonthEnd },
+        },
+      },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+    ]);
+    const prevMonthlySpend = parseFloat((prevSpendAgg[0]?.total ?? 0).toFixed(2));
+
+    // ── 5. Active Jobs Trend (Mon–Sun of current week) ───────────
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7)); // shift to Monday
+    monday.setHours(0, 0, 0, 0);
+
+    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const activeJobsTrend = await Promise.all(
+      weekDays.map(async (day, i) => {
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + i);
+        const dayEnd = new Date(date);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const count = await this.jobModel.countDocuments({
+          company: companyObjId,
+          status: { $in: activeStatuses },
+          timelineStartDate: { $lte: dayEnd },
+          timelineEndDate: { $gte: date },
+        });
+
+        return { day, date: date.toISOString().split('T')[0], count };
+      }),
+    );
+
+    // ── 6. Budget Spent — labor only ────────────────────────────
+    const laborBudget = monthlySpend; // all spend is labor (no materials/permits yet)
+
+    return {
+      activeJobs: {
+        current: activeJobs,
+        previousMonth: prevActiveJobs,
+        change: activeJobs - prevActiveJobs,
+      },
+      subsBooked: {
+        current: subsBooked,
+        previousMonth: prevSubsBooked,
+        change: subsBooked - prevSubsBooked,
+      },
+      pendingApprovals: {
+        current: pendingApprovals,
+        previousMonth: prevPendingApprovals,
+        change: pendingApprovals - prevPendingApprovals,
+      },
+      monthlySpend: {
+        current: monthlySpend,
+        previousMonth: prevMonthlySpend,
+        changePercent:
+          prevMonthlySpend === 0
+            ? null
+            : parseFloat((((monthlySpend - prevMonthlySpend) / prevMonthlySpend) * 100).toFixed(1)),
+      },
+      activeJobsTrend,
+      budgetSpent: {
+        labor: laborBudget,
+        total: laborBudget,
+      },
     };
   }
 }

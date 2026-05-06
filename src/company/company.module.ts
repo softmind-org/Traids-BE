@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { Company, CompanySchema } from './schema/company.schema';
+import { Job, JobSchema } from '../job/schema/job.schema';
+import { Timesheet, TimesheetSchema } from '../timesheet/schema/timesheet.schema';
+import { Invoice, InvoiceSchema } from '../invoice/schema/invoice.schema';
 import { CompanyService } from './company.service';
 import { CompanyController } from './company.controller';
 import { CommonModule } from '../common/common.module';
@@ -9,7 +12,12 @@ import { StripeModule } from '../stripe/stripe.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Company.name, schema: CompanySchema }]),
+    MongooseModule.forFeature([
+      { name: Company.name, schema: CompanySchema },
+      { name: Job.name, schema: JobSchema },
+      { name: Timesheet.name, schema: TimesheetSchema },
+      { name: Invoice.name, schema: InvoiceSchema },
+    ]),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
       signOptions: { expiresIn: '7d' },

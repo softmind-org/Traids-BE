@@ -153,6 +153,18 @@ export class SubcontractorController {
     }
   }
 
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  async getDashboard(@Request() req) {
+    return this.subcontractorService.getDashboardStats(req.user.sub);
+  }
+
+  @Get('recommended-jobs')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  async getRecommendedJobs(@Request() req) {
+    return this.subcontractorService.getRecommendedJobs(req.user.sub);
+  }
+
   @Get('bookings')
   @UseGuards(JwtAuthGuard)
   async getBookings(@Request() req) {

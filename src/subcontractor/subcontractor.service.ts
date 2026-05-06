@@ -4,6 +4,10 @@ import { JwtService } from '@nestjs/jwt';
 import { Model, Types } from 'mongoose';
 import { Subcontractor, SubcontractorDocument } from './schema/subcontractor.schema';
 import { Invoice, InvoiceDocument } from '../invoice/schema/invoice.schema';
+import { Job, JobDocument, Status } from '../job/schema/job.schema';
+import { Offer, OfferDocument, OfferStatus } from '../offer/schema/offer.schema';
+import { Timesheet, TimesheetDocument, TimesheetStatus } from '../timesheet/schema/timesheet.schema';
+import { JobApplication, JobApplicationDocument } from '../job-application/schema/job-application.schema';
 import { SignUpSubcontractorDto } from './dto/signup-subcontractor.dto';
 import { S3UploadService } from '../common/service/s3-upload.service';
 import { OpenAiService } from '../common/service/openai.service';
@@ -17,6 +21,14 @@ export class SubcontractorService {
     private subcontractorModel: Model<SubcontractorDocument>,
     @InjectModel(Invoice.name)
     private invoiceModel: Model<InvoiceDocument>,
+    @InjectModel(Job.name)
+    private jobModel: Model<JobDocument>,
+    @InjectModel(Offer.name)
+    private offerModel: Model<OfferDocument>,
+    @InjectModel(Timesheet.name)
+    private timesheetModel: Model<TimesheetDocument>,
+    @InjectModel(JobApplication.name)
+    private jobApplicationModel: Model<JobApplicationDocument>,
     private jwtService: JwtService,
     private s3UploadService: S3UploadService,
     private openAiService: OpenAiService,
@@ -407,5 +419,112 @@ export class SubcontractorService {
       sub.stripeAccountId,
     );
     return { payoutId: payout.id, amount: amountGBP, currency: 'GBP' };
+  }
+
+  // ─── DASHBOARD STATS ─────────────────────────────────────────────
+
+  async getDashboardStats(subcontractorId: string): Promise<{
+    totalEarnings: number;
+    pendingOffers: number;
+    pendingTimesheets: number;
+    profileCompletion: number;
+  }> {
+    const subObjId = new Types.ObjectId(subcontractorId);
+
+    // 1. Total earnings — sum of netPayable from paid invoice line items
+    const earningsResult = await this.invoiceModel.aggregate([
+      { $unwind: '$lineItems' },
+      {
+        $match: {
+          'lineItems.subcontractor': subObjId,
+          'lineItems.paid': true,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$lineItems.netPayable' },
+        },
+      },
+    ]);
+    const totalEarnings = parseFloat(
+      (earningsResult[0]?.total ?? 0).toFixed(2),
+    );
+
+    // 2. Pending offers — received but not yet accepted
+    const pendingOffers = await this.offerModel.countDocuments({
+      subcontractor: subObjId,
+      status: OfferStatus.PENDING,
+    });
+
+    // 3. Pending timesheets — submitted but not yet approved
+    const pendingTimesheets = await this.timesheetModel.countDocuments({
+      subcontractor: subObjId,
+      status: TimesheetStatus.SUBMITTED,
+    });
+
+    // 4. Profile completion — based on 10 meaningful fields
+    const sub = await this.subcontractorModel
+      .findById(subcontractorId)
+      .select(
+        'profileImage professionalBio phoneNumber yearsOfExperience insurance workExamples utr nino stripeOnboardingComplete hmrcConnected',
+      )
+      .lean();
+
+    const completionFields = [
+      !!sub?.profileImage,
+      !!sub?.professionalBio,
+      !!sub?.phoneNumber,
+      (sub?.yearsOfExperience ?? 0) > 0,
+      (sub?.insurance?.documents?.length ?? 0) > 0,
+      (sub?.workExamples?.length ?? 0) > 0,
+      !!sub?.utr,
+      !!sub?.nino,
+      sub?.stripeOnboardingComplete === true,
+      sub?.hmrcConnected === true,
+    ];
+
+    const filled = completionFields.filter(Boolean).length;
+    const profileCompletion = Math.round((filled / completionFields.length) * 100);
+
+    return { totalEarnings, pendingOffers, pendingTimesheets, profileCompletion };
+  }
+
+  // ─── RECOMMENDED JOBS ────────────────────────────────────────────
+
+  async getRecommendedJobs(subcontractorId: string) {
+    const subObjId = new Types.ObjectId(subcontractorId);
+
+    // Get subcontractor's primary trade
+    const sub = await this.subcontractorModel
+      .findById(subcontractorId)
+      .select('primaryTrade')
+      .lean();
+
+    if (!sub) throw new HttpException('Subcontractor not found', HttpStatus.NOT_FOUND);
+
+    // Find job IDs the subcontractor already applied to
+    const applications = await this.jobApplicationModel
+      .find({ subcontractor: subObjId })
+      .select('job')
+      .lean();
+
+    const appliedJobIds = applications.map((a) => a.job);
+
+    // Find open jobs matching the subcontractor's trade
+    // Exclude: already applied, already assigned, expired timeline
+    const jobs = await this.jobModel
+      .find({
+        trade: sub.primaryTrade,
+        status: Status.PENDING,
+        timelineEndDate: { $gte: new Date() },
+        assignedTo: { $ne: subObjId },
+        _id: { $nin: appliedJobIds },
+      })
+      .populate('company', 'companyName headOfficeAddress profileImage')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return jobs;
   }
 }

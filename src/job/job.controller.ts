@@ -28,6 +28,7 @@ import { JobApplication } from '../job-application/schema/job-application.schema
 import { OfferService } from '../offer/offer.service';
 import { Offer } from '../offer/schema/offer.schema';
 import { Status } from './schema/job.schema';
+import { RatingService } from '../rating/rating.service';
 
 @Controller('jobs')
 export class JobController {
@@ -35,6 +36,7 @@ export class JobController {
     private readonly jobService: JobService,
     private readonly jobApplicationService: JobApplicationService,
     private readonly offerService: OfferService,
+    private readonly ratingService: RatingService,
   ) { }
 
   @Post()
@@ -190,6 +192,66 @@ export class JobController {
       message: 'Job started successfully',
       data: job,
     };
+  }
+
+
+  /**
+   * Complete a job manually
+   * POST /jobs/:id/complete
+   */
+  @Post(':id/complete')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  async completeJob(@Param('id') jobId: string, @Request() req) {
+    const job = await this.jobService.completeJob(jobId, req.user.sub);
+    return {
+      success: true,
+      message: 'Job completed successfully',
+      data: job,
+    };
+  }
+
+  /**
+   * Rate a subcontractor on a job
+   * POST /jobs/:id/rate/:subcontractorId
+   */
+  @Post(':id/rate/:subcontractorId')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async rateSubcontractor(
+    @Param('id') jobId: string,
+    @Param('subcontractorId') subcontractorId: string,
+    @Body() body: { rating: number; comment?: string },
+    @Request() req,
+  ) {
+    const result = await this.ratingService.rateSubcontractor(
+      jobId,
+      subcontractorId,
+      req.user.sub,
+      body.rating,
+      body.comment,
+    );
+    return { success: true, message: 'Rating submitted successfully', data: result };
+  }
+
+  /**
+   * Get all ratings for a subcontractor
+   * GET /jobs/ratings/:subcontractorId
+   */
+  @Get('ratings/:subcontractorId')
+  @UseGuards(JwtAuthGuard)
+  async getSubcontractorRatings(@Param('subcontractorId') subcontractorId: string) {
+    return this.ratingService.getSubcontractorRatings(subcontractorId);
+  }
+
+  /**
+   * Get all ratings for a specific job
+   * GET /jobs/:id/ratings
+   */
+  @Get(':id/ratings')
+  @UseGuards(JwtAuthGuard)
+  async getJobRatings(@Param('id') jobId: string) {
+    return this.ratingService.getJobRatings(jobId);
   }
 
   /**

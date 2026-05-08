@@ -13,6 +13,7 @@ import { JobApplicationModule } from '../job-application/job-application.module'
 import { OfferModule } from '../offer/offer.module';
 import { ComplianceModule } from '../compliance/compliance.module';
 import { CommonModule } from '../common/common.module';
+import { RatingModule } from '../rating/rating.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CommonModule } from '../common/common.module';
     OfferModule,
     ComplianceModule,
     CommonModule,
+    RatingModule,
   ],
   controllers: [JobController],
   providers: [JobService, HmrcCompanyGuard],

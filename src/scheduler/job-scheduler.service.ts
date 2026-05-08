@@ -4,10 +4,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Job, JobDocument, Status } from '../job/schema/job.schema';
 
-/**
- * Job Scheduler Service
- * Handles automatic job status updates based on timeline dates
- */
 @Injectable()
 export class JobSchedulerService {
   private readonly logger = new Logger(JobSchedulerService.name);
@@ -17,42 +13,63 @@ export class JobSchedulerService {
   ) {}
 
   /**
-   * Cron job that runs every hour to check for jobs that should start
-   * Runs at minute 0 of every hour
+   * Runs every hour — auto-starts jobs whose timelineStartDate has passed.
    */
   @Cron(CronExpression.EVERY_HOUR)
   async autoStartJobs(): Promise<void> {
-    this.logger.log('Running auto-start jobs cron...');
+    this.logger.log('Job scheduler: checking jobs to auto-start...');
 
     try {
       const now = new Date();
 
-      // Find all pending jobs where timelineStartDate has passed
       const jobsToStart = await this.jobModel.find({
         status: Status.PENDING,
         timelineStartDate: { $lte: now },
       });
 
-      this.logger.log(`Found ${jobsToStart.length} jobs to auto-start`);
-
-      // Update each job to IN_PROGRESS
       for (const job of jobsToStart) {
         await this.jobModel.findByIdAndUpdate(job._id, {
           status: Status.IN_PROGRESS,
-          timelineStartDate: now,
         });
-
-        this.logger.log(`Auto-started job: ${job.jobTitle} (ID: ${job._id})`);
-
-        // TODO: Send notifications to assigned workers
-        // this.notificationService.notifyJobStarted(job);
+        this.logger.log(`Auto-started job: ${job.jobTitle} (${job._id})`);
       }
 
       if (jobsToStart.length > 0) {
-        this.logger.log(`Successfully auto-started ${jobsToStart.length} jobs`);
+        this.logger.log(`Auto-started ${jobsToStart.length} job(s)`);
       }
     } catch (error) {
       this.logger.error('Error in auto-start jobs cron:', error);
+    }
+  }
+
+  /**
+   * Runs daily at midnight — auto-completes jobs whose timelineEndDate has passed.
+   * Once completed, subcontractors can no longer log or submit timesheets for the job.
+   */
+  @Cron('0 0 * * *')
+  async autoCompleteJobs(): Promise<void> {
+    this.logger.log('Job scheduler: checking jobs to auto-complete...');
+
+    try {
+      // Start of today — jobs whose end date is strictly before today are expired
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const result = await this.jobModel.updateMany(
+        {
+          status: { $in: [Status.IN_PROGRESS, Status.ACCEPTED] },
+          timelineEndDate: { $lt: startOfToday },
+        },
+        { $set: { status: Status.COMPLETED } },
+      );
+
+      if (result.modifiedCount > 0) {
+        this.logger.log(`Auto-completed ${result.modifiedCount} job(s)`);
+      } else {
+        this.logger.log('No jobs to auto-complete');
+      }
+    } catch (error) {
+      this.logger.error('Error in auto-complete jobs cron:', error);
     }
   }
 }

@@ -89,6 +89,13 @@ export class Subcontractor {
   @Prop({ enum: [20, 30], default: 20 })
   cisDeductionRate: number;           // 20 = registered (HMRC connected), 30 = unregistered
 
+  // Ratings
+  @Prop({ default: 0 })
+  averageRating: number;
+
+  @Prop({ default: 0 })
+  totalRatings: number;
+
   // HMRC OAuth
   @Prop({ default: false })
   hmrcConnected: boolean;

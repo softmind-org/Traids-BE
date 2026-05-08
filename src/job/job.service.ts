@@ -1,7 +1,7 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Job, JobDocument } from './schema/job.schema';
+import { Job, JobDocument, Status } from './schema/job.schema';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { S3UploadService } from '../common/service/s3-upload.service';
@@ -251,6 +251,44 @@ export class JobService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  /**
+   * Manually complete a job (change status to COMPLETED)
+   * Only the company that owns the job can complete it.
+   * Job must be in IN_PROGRESS or ACCEPTED status.
+   */
+  async completeJob(jobId: string, companyId: string): Promise<JobDocument> {
+    const job = await this.jobModel.findById(jobId);
+
+    if (!job) {
+      throw new HttpException('Job not found', HttpStatus.NOT_FOUND);
+    }
+
+    if (job.company.toString() !== companyId) {
+      throw new HttpException('Unauthorized to complete this job', HttpStatus.FORBIDDEN);
+    }
+
+    if (job.status !== 'in_progress' && job.status !== 'accepted') {
+      throw new HttpException(
+        `Job cannot be completed. Current status: ${job.status}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const updatedJob = await this.jobModel
+      .findByIdAndUpdate(jobId, { status: 'completed' }, { new: true })
+      .populate('company', 'companyName workEmail phoneNumber')
+      .populate('assignedTo', 'fullName email primaryTrade')
+      .exec();
+
+    if (!updatedJob) {
+      throw new HttpException('Failed to complete job', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    this.logger.log(`Job manually completed: ${job.jobTitle} (${jobId}) by company ${companyId}`);
+
+    return updatedJob;
   }
 
   /**

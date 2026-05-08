@@ -292,6 +292,15 @@ export class TimesheetService {
             );
         }
 
+        // Block submission if the job has been completed (timeline ended)
+        const job = await this.jobModel.findById(timesheet.job).select('status').lean();
+        if (job?.status === 'completed') {
+            throw new HttpException(
+                'This job has ended — timesheets can no longer be submitted',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
         if (timesheet.dailyLogs.length === 0) {
             throw new HttpException(
                 'Cannot submit an empty timesheet — log at least one day',

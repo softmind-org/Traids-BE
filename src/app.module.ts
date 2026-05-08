@@ -19,6 +19,7 @@ import { TimesheetModule } from './timesheet/timesheet.module';
 import { InvoiceModule } from './invoice/invoice.module';
 import { HmrcModule } from './hmrc/hmrc.module';
 import { CisModule } from './cis/cis.module';
+import { RatingModule } from './rating/rating.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { CisModule } from './cis/cis.module';
     InvoiceModule,
     HmrcModule,
     CisModule,
+    RatingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

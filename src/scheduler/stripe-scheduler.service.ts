@@ -116,8 +116,9 @@ export class StripeSchedulerService {
                     continue;
                 }
 
-                // Transfer netPayable in pence (already has platform fee deducted)
-                const amountPence = Math.round(lineItem.netPayable * 100);
+                // Transfer gross - CIS to subcontractor; platform fee stays in Traids Stripe account
+                const subcontractorAmount = parseFloat((lineItem.grossAmount - lineItem.cisDeduction).toFixed(2));
+                const amountPence = Math.round(subcontractorAmount * 100);
 
                 await this.stripeService.createTransfer(
                     amountPence,
@@ -133,7 +134,7 @@ export class StripeSchedulerService {
                 );
 
                 this.logger.log(
-                    `Transfer of £${lineItem.netPayable} sent to ${lineItem.subcontractorName}`,
+                    `Transfer of £${subcontractorAmount} sent to ${lineItem.subcontractorName} (gross £${lineItem.grossAmount} - CIS £${lineItem.cisDeduction})`,
                 );
             } catch (err) {
                 this.logger.error(

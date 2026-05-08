@@ -155,6 +155,13 @@ export class CompanyController {
     return { success: true, data };
   }
 
+  @Get('reports')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async getReports(@Request() req) {
+    const data = await this.companyService.getReportStats(req.user.sub);
+    return { success: true, data };
+  }
+
   @Get('payment-method')
   @UseGuards(JwtAuthGuard, AdminGuard)
   async getPaymentMethod(@Request() req) {

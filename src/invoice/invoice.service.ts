@@ -104,7 +104,7 @@ export class InvoiceService {
             const sub = ts.subcontractor as any;
             const cisDeductionRate: number = sub?.cisDeductionRate ?? 30;
             const cisDeduction = parseFloat((ts.grossAmount * cisDeductionRate / 100).toFixed(2));
-            const netPayable = parseFloat((ts.grossAmount - cisDeduction).toFixed(2)); // platform fee paid by company separately
+            const netPayable = parseFloat((ts.grossAmount - cisDeduction + ts.platformFee).toFixed(2)); // gross - CIS + platform fee = total company pays
 
             return {
                 subcontractor: ts.subcontractor,

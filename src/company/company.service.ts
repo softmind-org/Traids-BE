@@ -417,6 +417,76 @@ export class CompanyService {
     };
   }
 
+  // ─── FINANCIAL STATS ──────────────────────────────────────────────
+
+  async getFinancialSummary(companyId: string) {
+    const companyObjId = new Types.ObjectId(companyId);
+    const now = new Date();
+    const ytdStart = new Date(now.getFullYear(), 0, 1);
+    const lastYtdStart = new Date(now.getFullYear() - 1, 0, 1);
+    const lastYtdEnd = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate(), 23, 59, 59);
+
+    // 1. Total Spend YTD (paid invoices from Jan 1 of this year)
+    const [ytdAgg, lastYtdAgg] = await Promise.all([
+      this.invoiceModel.aggregate([
+        { $match: { company: companyObjId, paymentStatus: InvoicePaymentStatus.PAID, paidAt: { $gte: ytdStart } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
+      this.invoiceModel.aggregate([
+        { $match: { company: companyObjId, paymentStatus: InvoicePaymentStatus.PAID, paidAt: { $gte: lastYtdStart, $lte: lastYtdEnd } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
+    ]);
+    const totalSpendYTD = parseFloat((ytdAgg[0]?.total ?? 0).toFixed(2));
+    const lastYearSpendYTD = parseFloat((lastYtdAgg[0]?.total ?? 0).toFixed(2));
+
+    // 2. Active Projects
+    const activeProjects = await this.jobModel.countDocuments({
+      company: companyObjId,
+      status: { $in: [Status.ACCEPTED, Status.IN_PROGRESS] },
+    });
+
+    // 3. Avg Contractor Rating — across all subs who worked for this company
+    const subRatingAgg = await this.invoiceModel.aggregate([
+      { $match: { company: companyObjId } },
+      { $unwind: '$lineItems' },
+      { $group: { _id: '$lineItems.subcontractor' } },
+      { $lookup: { from: 'subcontractors', localField: '_id', foreignField: '_id', as: 'sub' } },
+      { $unwind: '$sub' },
+      { $match: { 'sub.totalRatings': { $gt: 0 } } },
+      { $group: { _id: null, avgRating: { $avg: '$sub.averageRating' } } },
+    ]);
+    const avgContractorRating = parseFloat((subRatingAgg[0]?.avgRating ?? 0).toFixed(1));
+
+    // 4. On-Time Completion — completed jobs vs (completed + overdue active jobs)
+    const [completedJobs, delayedJobs] = await Promise.all([
+      this.jobModel.countDocuments({ company: companyObjId, status: Status.COMPLETED }),
+      this.jobModel.countDocuments({
+        company: companyObjId,
+        status: { $in: [Status.IN_PROGRESS, Status.ACCEPTED] },
+        timelineEndDate: { $lt: now },
+      }),
+    ]);
+    const totalForOnTime = completedJobs + delayedJobs;
+    const onTimeCompletionPercent =
+      totalForOnTime > 0
+        ? parseFloat(((completedJobs / totalForOnTime) * 100).toFixed(1))
+        : 100;
+
+    return {
+      totalSpendYTD: {
+        amount: totalSpendYTD,
+        vsLastYearPercent:
+          lastYearSpendYTD > 0
+            ? parseFloat((((totalSpendYTD - lastYearSpendYTD) / lastYearSpendYTD) * 100).toFixed(1))
+            : null,
+      },
+      activeProjects,
+      avgContractorRating,
+      onTimeCompletionPercent,
+    };
+  }
+
   // ─── REPORT STATS ─────────────────────────────────────────────────
 
   async getReportStats(companyId: string) {

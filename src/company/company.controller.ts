@@ -5,6 +5,7 @@ import {
   Patch,
   Body,
   Request,
+  Query,
   HttpException,
   HttpStatus,
   UseInterceptors,
@@ -159,6 +160,13 @@ export class CompanyController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   async getReports(@Request() req) {
     const data = await this.companyService.getReportStats(req.user.sub);
+    return { success: true, data };
+  }
+
+  @Get('financials/summary')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async getFinancialSummary(@Request() req: { user: { sub: string } }) {
+    const data = await this.companyService.getFinancialSummary(req.user.sub);
     return { success: true, data };
   }
 

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNumber, IsBoolean, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsBoolean, IsEnum, IsIn } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PrimaryTrade } from '../schema/subcontractor.schema';
 
@@ -82,4 +82,10 @@ export class UpdateSubcontractorDto {
     @Transform(({ value }) => value === 'true' || value === true)
     @IsBoolean()
     timesheetReminders?: boolean;
+
+    @IsOptional()
+    @Transform(({ value }) => Number(value))
+    @IsNumber()
+    @IsIn([20, 30])
+    cisDeductionRate?: 20 | 30;
 }

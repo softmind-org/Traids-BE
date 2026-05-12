@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+// Post/HttpCode kept for markAsPaid endpoint
 import { CisReturnService } from './cis-return.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
@@ -35,16 +36,7 @@ export class CisReturnController {
     return this.cisReturnService.getReturn(id, req.user.sub);
   }
 
-  /**
-   * POST /cis-returns/:id/submit
-   * Company marks the return as submitted to HMRC.
-   * Returns payment amount + due date for redirect to HMRC payment portal.
-   */
-  @Post(':id/submit')
-  @HttpCode(HttpStatus.OK)
-  submitReturn(@Param('id') id: string, @Request() req) {
-    return this.cisReturnService.submitReturn(id, req.user.sub);
-  }
+  // POST /cis-returns/:id/submit — deferred to Phase 2 (HMRC submission)
 
   /**
    * POST /cis-returns/:id/mark-paid

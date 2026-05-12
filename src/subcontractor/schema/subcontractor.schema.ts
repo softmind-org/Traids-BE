@@ -80,14 +80,12 @@ export class Subcontractor {
   stripeOnboardingComplete: boolean;
 
   // HMRC / CIS
-  @Prop()
-  utr?: string;                       // Unique Taxpayer Reference (10 digits)
+  // Phase 2 — deferred until HMRC integration is re-enabled
+  // @Prop() utr?: string;    // Unique Taxpayer Reference (10 digits)
+  // @Prop() nino?: string;   // National Insurance Number (e.g. PE938808A)
 
-  @Prop()
-  nino?: string;                      // National Insurance Number (e.g. PE938808A)
-
-  @Prop({ enum: [20, 30], default: 20 })
-  cisDeductionRate: number;           // 20 = registered (HMRC connected), 30 = unregistered
+  @Prop({ enum: [20, 30], default: 30 })
+  cisDeductionRate: number;           // set by subcontractor in profile settings
 
   // Ratings
   @Prop({ default: 0 })

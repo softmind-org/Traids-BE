@@ -8,7 +8,6 @@ import { Compliance, ComplianceSchema } from '../compliance/schema/compliance.sc
 import { Company, CompanySchema } from '../company/schema/company.schema';
 import { JobController } from './job.controller';
 import { JobService } from './job.service';
-import { HmrcCompanyGuard } from '../auth/guards/hmrc-company.guard';
 import { JobApplicationModule } from '../job-application/job-application.module';
 import { OfferModule } from '../offer/offer.module';
 import { ComplianceModule } from '../compliance/compliance.module';
@@ -35,7 +34,7 @@ import { RatingModule } from '../rating/rating.module';
     RatingModule,
   ],
   controllers: [JobController],
-  providers: [JobService, HmrcCompanyGuard],
+  providers: [JobService],
   exports: [JobService],
 })
 export class JobModule { }

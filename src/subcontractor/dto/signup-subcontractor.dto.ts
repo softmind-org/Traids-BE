@@ -71,11 +71,12 @@ export class SignUpSubcontractorDto {
   @IsString({ each: true })
   workExamples?: string[];
 
-  @IsOptional()
-  @IsString()
-  utr?: string;                 // HMRC Unique Taxpayer Reference (10 digits)
+  // Phase 2 — deferred until HMRC integration is re-enabled
+  // @IsOptional()
+  // @IsString()
+  // utr?: string;              // HMRC Unique Taxpayer Reference (10 digits)
 
-  @IsOptional()
-  @IsString()
-  nino?: string;                // National Insurance Number (e.g. PE938808A)
+  // @IsOptional()
+  // @IsString()
+  // nino?: string;             // National Insurance Number (e.g. PE938808A)
 }

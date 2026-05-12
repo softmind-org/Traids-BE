@@ -111,8 +111,8 @@ export class SubcontractorService {
       },
       profileImage: profileImageUrl || signUpSubcontractorDto.profileImage,
       workExamples: workExamplesUrls.length > 0 ? workExamplesUrls : signUpSubcontractorDto.workExamples,
-      utr: signUpSubcontractorDto.utr,
-      nino: signUpSubcontractorDto.nino,
+      // utr: signUpSubcontractorDto.utr,   // Phase 2
+      // nino: signUpSubcontractorDto.nino, // Phase 2
       cisDeductionRate,
     });
 
@@ -167,6 +167,7 @@ export class SubcontractorService {
     if (updateDto.yearsOfExperience !== undefined) updateData.yearsOfExperience = updateDto.yearsOfExperience;
     if (updateDto.jobAlerts !== undefined) updateData.jobAlerts = updateDto.jobAlerts;
     if (updateDto.timesheetReminders !== undefined) updateData.timesheetReminders = updateDto.timesheetReminders;
+    if (updateDto.cisDeductionRate !== undefined) updateData.cisDeductionRate = updateDto.cisDeductionRate;
 
     // Handle password change
     if (updateDto.newPassword) {
@@ -467,7 +468,7 @@ export class SubcontractorService {
     const sub = await this.subcontractorModel
       .findById(subcontractorId)
       .select(
-        'profileImage professionalBio phoneNumber yearsOfExperience insurance workExamples utr nino stripeOnboardingComplete hmrcConnected',
+        'profileImage professionalBio phoneNumber yearsOfExperience insurance workExamples stripeOnboardingComplete',
       )
       .lean();
 
@@ -478,10 +479,8 @@ export class SubcontractorService {
       (sub?.yearsOfExperience ?? 0) > 0,
       (sub?.insurance?.documents?.length ?? 0) > 0,
       (sub?.workExamples?.length ?? 0) > 0,
-      !!sub?.utr,
-      !!sub?.nino,
       sub?.stripeOnboardingComplete === true,
-      sub?.hmrcConnected === true,
+      // utr, nino, hmrcConnected — Phase 2
     ];
 
     const filled = completionFields.filter(Boolean).length;

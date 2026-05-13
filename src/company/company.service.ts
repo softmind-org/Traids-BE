@@ -25,6 +25,32 @@ export class CompanyService {
     private stripeService: StripeService,
   ) { }
 
+  async validate(fields: { workEmail?: string; registrationNumber?: string; phoneNumber?: string }): Promise<Record<string, { valid: boolean; message?: string }>> {
+    const result: Record<string, { valid: boolean; message?: string }> = {};
+
+    if (fields.workEmail !== undefined) {
+      const exists = await this.companyModel.exists({ workEmail: fields.workEmail });
+      result.workEmail = exists
+        ? { valid: false, message: 'Email already in use' }
+        : { valid: true };
+    }
+
+    if (fields.registrationNumber !== undefined) {
+      const exists = await this.companyModel.exists({ registrationNumber: fields.registrationNumber });
+      result.registrationNumber = exists
+        ? { valid: false, message: 'Registration number already in use' }
+        : { valid: true };
+    }
+    if (fields.phoneNumber !== undefined) {
+      const exists = await this.companyModel.exists({ phoneNumber: fields.phoneNumber });
+      result.phoneNumber = exists
+        ? { valid: false, message: 'Phone number already in use' }
+        : { valid: true };
+    }
+
+    return result;
+  }
+
   async signUp(
     signUpCompanyDto: SignUpCompanyDto,
     files?: {

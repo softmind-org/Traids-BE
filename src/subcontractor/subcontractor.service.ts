@@ -35,6 +35,19 @@ export class SubcontractorService {
     private stripeService: StripeService,
   ) { }
 
+  async validate(fields: { email?: string }): Promise<Record<string, { valid: boolean; message?: string }>> {
+    const result: Record<string, { valid: boolean; message?: string }> = {};
+
+    if (fields.email !== undefined) {
+      const exists = await this.subcontractorModel.exists({ email: fields.email });
+      result.email = exists
+        ? { valid: false, message: 'Email already in use' }
+        : { valid: true };
+    }
+
+    return result;
+  }
+
   async uploadDocumentWithExpiry(
     file: Express.Multer.File,
     documentType: 'insurance' | 'tickets' | 'certification',

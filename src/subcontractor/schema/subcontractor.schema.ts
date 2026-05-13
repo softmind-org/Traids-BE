@@ -10,7 +10,21 @@ export enum PrimaryTrade {
   MASONRY = 'masonry',
 }
 
-@Schema({ timestamps: true })
+const SENSITIVE_FIELDS = [
+  'password', 'resetToken', 'resetTokenExpires',
+  'stripeAccountId',
+  'hmrcAccessToken', 'hmrcRefreshToken', 'hmrcTokenExpiry',
+];
+
+@Schema({
+  timestamps: true,
+  toJSON: {
+    transform: (_doc, ret) => {
+      SENSITIVE_FIELDS.forEach((f) => delete ret[f]);
+      return ret;
+    },
+  },
+})
 export class Subcontractor {
   @Prop({ required: true })
   fullName: string;

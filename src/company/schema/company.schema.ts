@@ -9,7 +9,21 @@ export enum IndustryType {
   RECRUITMENT = 'recruitment',
 }
 
-@Schema({ timestamps: true })
+const SENSITIVE_FIELDS = [
+  'password', 'resetToken', 'resetTokenExpires',
+  'stripeCustomerId', 'stripeDefaultPaymentMethodId',
+  'hmrcAccessToken', 'hmrcRefreshToken', 'hmrcTokenExpiry',
+];
+
+@Schema({
+  timestamps: true,
+  toJSON: {
+    transform: (_doc, ret) => {
+      SENSITIVE_FIELDS.forEach((f) => delete ret[f]);
+      return ret;
+    },
+  },
+})
 export class Company {
   @Prop({ required: true })
   companyName: string;

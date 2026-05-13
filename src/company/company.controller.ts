@@ -25,6 +25,19 @@ import { AdminGuard } from '../auth/guards/admin.guard';
 export class CompanyController {
   constructor(private readonly companyService: CompanyService) { }
 
+  /**
+   * POST /company/validate
+   * Public — validate one or more fields before or during signup.
+   * Accepted fields: workEmail, registrationNumber
+   */
+  @Post('validate')
+  @HttpCode(HttpStatus.OK)
+  async validate(@Body() body: { workEmail?: string; registrationNumber?: string; phoneNumber?: string }) {
+    const accepted = { workEmail: body.workEmail, registrationNumber: body.registrationNumber, phoneNumber: body.phoneNumber };
+    const result = await this.companyService.validate(accepted);
+    return { success: true, data: result };
+  }
+
   @Post('signup')
   @UseInterceptors(
     FileFieldsInterceptor([

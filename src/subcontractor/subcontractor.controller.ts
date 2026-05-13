@@ -36,6 +36,19 @@ export class SubcontractorController {
   ) { }
 
   /**
+   * POST /subcontractor/validate
+   * Public — validate one or more fields before or during signup.
+   * Accepted fields: email
+   */
+  @Post('validate')
+  @HttpCode(HttpStatus.OK)
+  async validate(@Body() body: { email?: string }) {
+    const accepted = { email: body.email };
+    const result = await this.subcontractorService.validate(accepted);
+    return { success: true, data: result };
+  }
+
+  /**
    * POST /subcontractor/upload-document
    * Public — called before signup. Uploads a single document to S3
    * and uses OpenAI vision to extract the expiry date.

@@ -5,6 +5,7 @@ import { Offer, OfferDocument, OfferStatus } from './schema/offer.schema';
 import { Job, JobDocument } from '../job/schema/job.schema';
 import { Subcontractor, SubcontractorDocument } from '../subcontractor/schema/subcontractor.schema';
 import { Company, CompanyDocument } from '../company/schema/company.schema';
+import { JobApplication, JobApplicationDocument, ApplicationStatus } from '../job-application/schema/job-application.schema';
 import { CreateOfferDto } from './dto/create-offer.dto';
 import { S3UploadService } from '../common/service/s3-upload.service';
 import { SubcontractorSocketService } from '../socket/subcontractorSocket.service';
@@ -18,6 +19,7 @@ export class OfferService {
     @InjectModel(Job.name) private jobModel: Model<JobDocument>,
     @InjectModel(Subcontractor.name) private subcontractorModel: Model<SubcontractorDocument>,
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
+    @InjectModel(JobApplication.name) private jobApplicationModel: Model<JobApplicationDocument>,
     private s3UploadService: S3UploadService,
     private subcontractorSocketService: SubcontractorSocketService,
     private companySocketService: CompanySocketService,
@@ -382,7 +384,22 @@ export class OfferService {
         await job.save();
       }
 
-      // 9. Get company and subcontractor details for notification
+      // 9. Upsert a JobApplication record so the subcontractor appears in the
+      //    job's applications list (offer-accepted path has no prior application)
+      await this.jobApplicationModel.findOneAndUpdate(
+        { job: job._id, subcontractor: new Types.ObjectId(subcontractorId) },
+        {
+          $setOnInsert: {
+            company: job.company,
+            fullName: (offer.subcontractor as any).fullName || '',
+            appliedAt: new Date(),
+          },
+          $set: { status: ApplicationStatus.ACCEPTED },
+        },
+        { upsert: true, new: true },
+      );
+
+      // 10. Get company and subcontractor details for notification
       const company = await this.companyModel.findById(job.company).exec();
       const subcontractor = await this.subcontractorModel.findById(subcontractorId).exec();
 

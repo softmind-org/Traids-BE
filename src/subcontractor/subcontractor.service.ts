@@ -506,17 +506,15 @@ export class SubcontractorService {
     const sub = await this.subcontractorModel
       .findById(subcontractorId)
       .select(
-        'profileImage professionalBio phoneNumber yearsOfExperience insurance workExamples stripeOnboardingComplete',
+        'profileImage professionalBio yearsOfExperience insurance stripeOnboardingComplete',
       )
       .lean();
 
     const completionFields = [
       !!sub?.profileImage,
       !!sub?.professionalBio,
-      !!sub?.phoneNumber,
       (sub?.yearsOfExperience ?? 0) > 0,
       (sub?.insurance?.documents?.length ?? 0) > 0,
-      (sub?.workExamples?.length ?? 0) > 0,
       sub?.stripeOnboardingComplete === true,
       // utr, nino, hmrcConnected — Phase 2
     ];

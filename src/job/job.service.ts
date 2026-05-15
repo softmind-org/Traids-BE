@@ -103,7 +103,7 @@ export class JobService {
   }
 
   async getAllJobsWithFilters(filters: {
-    trade?: string;
+    trade?: string[];
     maxHourlyRate?: number;
     location?: string;
     startDate?: Date;
@@ -123,9 +123,9 @@ export class JobService {
       // Exclude offer-type jobs (subcontractors can only apply to request-type jobs)
       query.typeOfJob = { $ne: 'offer' };
 
-      // Filter by trade type
-      if (filters.trade) {
-        query.trade = filters.trade;
+      // Filter by trade type (supports multiple values)
+      if (filters.trade?.length) {
+        query.trade = filters.trade.length === 1 ? filters.trade[0] : { $in: filters.trade };
       }
 
       // Filter by hourly rate - find jobs near the maximum hourly rate

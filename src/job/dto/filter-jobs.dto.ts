@@ -1,11 +1,13 @@
-import { IsOptional, IsEnum, IsNumber, IsString, IsDateString } from 'class-validator';
+import { IsOptional, IsEnum, IsNumber, IsString, IsDateString, IsArray } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { Trade } from '../schema/job.schema';
 
 export class FilterJobsDto {
   @IsOptional()
-  @IsEnum(Trade)
-  trade?: Trade;
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @IsArray()
+  @IsEnum(Trade, { each: true })
+  trade?: Trade[];
 
   @IsOptional()
   @Transform(({ value }) => Number(value))

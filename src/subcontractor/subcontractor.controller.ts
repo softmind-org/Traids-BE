@@ -69,11 +69,20 @@ export class SubcontractorController {
         HttpStatus.BAD_REQUEST,
       );
     }
-    const result = await this.subcontractorService.uploadDocumentWithExpiry(
-      files.file[0],
-      documentType,
-    );
-    return { success: true, ...result };
+    try {
+      const result = await this.subcontractorService.uploadDocumentWithExpiry(
+        files.file[0],
+        documentType,
+      );
+      return { success: true, ...result };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to upload document',
+        error.message?.includes('does not appear to be a valid')
+          ? HttpStatus.UNPROCESSABLE_ENTITY
+          : HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Post('signup')
@@ -158,6 +167,9 @@ export class SubcontractorController {
       }
       if (error.message === 'Email already in use') {
         throw new HttpException('Email already in use', HttpStatus.BAD_REQUEST);
+      }
+      if (error.message?.includes('does not appear to be a valid')) {
+        throw new HttpException(error.message, HttpStatus.UNPROCESSABLE_ENTITY);
       }
       throw new HttpException(
         error.message || 'Failed to update profile',

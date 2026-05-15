@@ -13,6 +13,56 @@ export class OpenAiService {
   }
 
   /**
+   * Uses Claude vision to verify the uploaded file is actually the expected
+   * document type (insurance, tickets, or certification).
+   * Throws if the image is unrelated (e.g. a personal photo, meme, etc.).
+   */
+  async validateDocumentType(
+    imageBase64: string,
+    mimeType: string,
+    documentType: 'insurance' | 'tickets' | 'certification',
+  ): Promise<void> {
+    const descriptions: Record<string, string> = {
+      insurance: 'an insurance policy, certificate of insurance, or liability insurance document',
+      tickets: 'a trade licence, qualification ticket, certification card, or skills ticket for a tradesperson',
+      certification: 'a professional certification, accreditation certificate, or trade qualification document',
+    };
+
+    const response = await this.client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 100,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+                data: imageBase64,
+              },
+            },
+            {
+              type: 'text',
+              text: `Does this image show ${descriptions[documentType]}? Answer with YES or NO only. Do not explain.`,
+            },
+          ],
+        },
+      ],
+    });
+
+    const answer = (response.content[0] as any)?.text?.trim().toUpperCase();
+    this.logger.log(`Document type validation (${documentType}): ${answer}`);
+
+    if (!answer || !answer.startsWith('YES')) {
+      throw new Error(
+        `The uploaded file does not appear to be a valid ${documentType} document. Please upload the correct document type.`,
+      );
+    }
+  }
+
+  /**
    * Sends a document image (as base64) to Claude vision
    * and extracts the expiry date. Returns an ISO date string or null.
    */

@@ -58,11 +58,15 @@ export class SubcontractorService {
       certification: 'subcontractors/certification',
     };
 
-    // Upload file to S3
+    // Convert buffer to base64 for vision checks
+    const base64 = file.buffer.toString('base64');
+
+    // Reject files that are not the expected document type (e.g. personal photos)
+    await this.openAiService.validateDocumentType(base64, file.mimetype, documentType);
+
+    // Upload file to S3 only after validation passes
     const url = await this.s3UploadService.uploadFile(file, folderMap[documentType]);
 
-    // Convert buffer to base64 for OpenAI vision
-    const base64 = file.buffer.toString('base64');
     const expiresAt = await this.openAiService.extractExpiryDate(base64, file.mimetype);
 
     return { url, expiresAt };
@@ -199,6 +203,13 @@ export class SubcontractorService {
 
       // Upload and replace insurance documents
       if (files.insuranceDocuments?.length) {
+        for (const doc of files.insuranceDocuments) {
+          await this.openAiService.validateDocumentType(
+            doc.buffer.toString('base64'),
+            doc.mimetype,
+            'insurance',
+          );
+        }
         const newUrls = await this.s3UploadService.uploadMultipleFiles(
           files.insuranceDocuments,
           'subcontractors/insurance',
@@ -216,6 +227,13 @@ export class SubcontractorService {
 
       // Upload and replace tickets documents
       if (files.ticketsDocuments?.length) {
+        for (const doc of files.ticketsDocuments) {
+          await this.openAiService.validateDocumentType(
+            doc.buffer.toString('base64'),
+            doc.mimetype,
+            'tickets',
+          );
+        }
         const newUrls = await this.s3UploadService.uploadMultipleFiles(
           files.ticketsDocuments,
           'subcontractors/tickets',
@@ -233,6 +251,13 @@ export class SubcontractorService {
 
       // Upload and replace certification documents
       if (files.certificationDocuments?.length) {
+        for (const doc of files.certificationDocuments) {
+          await this.openAiService.validateDocumentType(
+            doc.buffer.toString('base64'),
+            doc.mimetype,
+            'certification',
+          );
+        }
         const newUrls = await this.s3UploadService.uploadMultipleFiles(
           files.certificationDocuments,
           'subcontractors/certification',

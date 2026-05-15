@@ -19,6 +19,7 @@ import { JobService } from './job.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { FilterJobsDto } from './dto/filter-jobs.dto';
+import { SearchJobsDto } from './dto/search-jobs.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { SubcontractorGuard } from '../auth/guards/subcontractor.guard';
@@ -82,6 +83,24 @@ export class JobController {
 
     return {
       message: 'Available jobs retrieved successfully',
+      count: result.jobs.length,
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages,
+      data: result.jobs,
+    };
+  }
+
+  @Get('search')
+  @UseGuards(JwtAuthGuard, SubcontractorGuard)
+  async searchAvailableJobs(@Query() searchJobsDto: SearchJobsDto) {
+    const result = await this.jobService.searchAvailableJobs(
+      searchJobsDto.q,
+      searchJobsDto.page,
+    );
+
+    return {
+      message: 'Search results retrieved successfully',
       count: result.jobs.length,
       total: result.total,
       page: result.page,

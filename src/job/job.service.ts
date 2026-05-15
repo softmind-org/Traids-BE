@@ -172,6 +172,40 @@ export class JobService {
       );
     }
   }
+
+  async searchAvailableJobs(
+    q: string,
+    page = 1,
+  ): Promise<{ jobs: JobDocument[]; total: number; page: number; totalPages: number }> {
+    const limit = 20;
+    const skip = (page - 1) * limit;
+    const regex = { $regex: q, $options: 'i' };
+
+    const query: any = {
+      status: 'pending',
+      typeOfJob: { $ne: 'offer' },
+      $expr: { $lt: [{ $size: { $ifNull: ['$assignedTo', []] } }, '$workersRequired'] },
+      $or: [
+        { jobTitle: regex },
+        { description: regex },
+        { siteAddress: regex },
+        { trade: regex },
+      ],
+    };
+
+    const [total, jobs] = await Promise.all([
+      this.jobModel.countDocuments(query),
+      this.jobModel
+        .find(query)
+        .populate('company', 'companyName workEmail phoneNumber headOfficeAddress profileImage')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+    ]);
+
+    return { jobs, total, page, totalPages: Math.ceil(total / limit) };
+  }
   async getJobById(jobId: string): Promise<JobDocument> {
     try {
       const job = await this.jobModel.findById(jobId)

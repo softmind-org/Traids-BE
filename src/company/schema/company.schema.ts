@@ -83,6 +83,19 @@ export class Company {
   @Prop()
   stripeDefaultPaymentMethodId?: string;
 
+  // Card metadata — stored at save-card time to calculate correct Stripe fee per invoice
+  @Prop()
+  cardBrand?: string;       // e.g. "visa", "mastercard"
+
+  @Prop()
+  cardCountry?: string;     // ISO 3166-1 alpha-2, e.g. "GB", "US", "DE"
+
+  @Prop()
+  cardFunding?: string;     // "credit" | "debit" | "prepaid"
+
+  @Prop()
+  cardLast4?: string;       // last 4 digits for display
+
   // HMRC / CIS
   @Prop()
   utr?: string;                     // Company Unique Taxpayer Reference (10 digits)

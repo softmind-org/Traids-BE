@@ -248,8 +248,15 @@ export class CompanyService {
       company.stripeCustomerId,
       paymentMethodId,
     );
+
+    const pm = await this.stripeService.retrievePaymentMethod(paymentMethodId);
+
     await this.companyModel.findByIdAndUpdate(companyId, {
       stripeDefaultPaymentMethodId: paymentMethodId,
+      cardBrand: pm.card?.brand ?? null,
+      cardCountry: pm.card?.country ?? null,
+      cardFunding: pm.card?.funding ?? null,
+      cardLast4: pm.card?.last4 ?? null,
     });
   }
 

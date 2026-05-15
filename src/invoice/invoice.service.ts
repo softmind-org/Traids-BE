@@ -37,6 +37,33 @@ export class InvoiceService {
     // ─────────────────────────────────────────────────────────────
 
     /**
+     * Calculate the Stripe processing fee to pass on to the company.
+     * Rates (Stripe UK pricing):
+     *   - UK card:            1.5% + £0.20
+     *   - EEA card:           2.5% + £0.20
+     *   - Non-EEA / unknown:  3.25% + £0.20
+     */
+    private calculateStripeFee(amount: number, cardCountry: string | null): number {
+        const EEA_COUNTRIES = new Set([
+            'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI',
+            'FR', 'GR', 'HR', 'HU', 'IE', 'IS', 'IT', 'LI', 'LT', 'LU',
+            'LV', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK',
+        ]);
+
+        let rate: number;
+        if (cardCountry === 'GB') {
+            rate = 0.015;
+        } else if (cardCountry && EEA_COUNTRIES.has(cardCountry)) {
+            rate = 0.025;
+        } else {
+            rate = 0.0325;
+        }
+
+        const fee = parseFloat((amount * rate + 0.20).toFixed(2));
+        return fee;
+    }
+
+    /**
      * Generate a sequential invoice number like INV-00101.
      */
     private async generateInvoiceNumber(): Promise<string> {
@@ -131,9 +158,17 @@ export class InvoiceService {
         const totalCisDeduction = parseFloat(
             lineItems.reduce((sum, li) => sum + li.cisDeduction, 0).toFixed(2),
         );
-        const totalAmount = parseFloat(
+        const baseAmount = parseFloat(
             lineItems.reduce((sum, li) => sum + li.netPayable, 0).toFixed(2),
         );
+
+        // Calculate Stripe transaction fee based on company's saved card country
+        const company = await this.companyModel
+            .findById(job.company)
+            .select('cardCountry')
+            .lean();
+        const stripeFee = this.calculateStripeFee(baseAmount, company?.cardCountry ?? null);
+        const totalAmount = parseFloat((baseAmount + stripeFee).toFixed(2));
 
         const invoiceNumber = await this.generateInvoiceNumber();
 
@@ -151,6 +186,7 @@ export class InvoiceService {
             subtotal,
             totalPlatformFee,
             totalCisDeduction,
+            stripeFee,
             totalAmount,
             status: InvoiceStatus.FINALIZED,
             dueDate,
@@ -159,7 +195,7 @@ export class InvoiceService {
         const saved = await invoice.save();
 
         this.logger.log(
-            `Invoice generated: ${invoiceNumber} for job ${jobId} week ${weekNumber}. Total: £${totalAmount}`,
+            `Invoice generated: ${invoiceNumber} for job ${jobId} week ${weekNumber}. Base: £${baseAmount}, Stripe fee: £${stripeFee}, Total: £${totalAmount}`,
         );
 
         return saved;

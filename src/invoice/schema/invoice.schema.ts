@@ -91,7 +91,10 @@ export class Invoice {
     totalCisDeduction: number;  // sum of all lineItems.cisDeduction — held by company for HMRC
 
     @Prop({ required: true, default: 0 })
-    totalAmount: number; // sum of all lineItems.netPayable (what company pays out)
+    stripeFee: number;   // Stripe transaction fee added to totalAmount (passed on to company)
+
+    @Prop({ required: true, default: 0 })
+    totalAmount: number; // subtotal + stripeFee (what company is charged)
 
     @Prop({ required: true, enum: InvoiceStatus, default: InvoiceStatus.FINALIZED })
     status: InvoiceStatus;

@@ -210,7 +210,7 @@ export class JobService {
     try {
       const job = await this.jobModel.findById(jobId)
         .populate('company', 'companyName workEmail phoneNumber headOfficeAddress profileImage')
-        .populate('assignedTo', 'fullName email primaryTrade profileImage')
+        .populate('assignedTo', 'fullName email primaryTrade hourlyRate yearsOfExperience cityLocation averageRating profileImage professionalBio')
         .exec();
 
       if (!job) {

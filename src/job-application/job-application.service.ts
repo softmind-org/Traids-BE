@@ -119,7 +119,7 @@ export class JobApplicationService {
 
             return await this.applicationModel
                 .find(query)
-                .populate('subcontractor', 'fullName email primaryTrade yearsOfExperience hourlyRate profileImage cityLocation postcode')
+                .populate('subcontractor', 'fullName email primaryTrade hourlyRate yearsOfExperience cityLocation averageRating profileImage postcode professionalBio')
                 .sort({ appliedAt: -1 })
                 .exec();
         } catch (error) {
@@ -135,7 +135,7 @@ export class JobApplicationService {
 
     async getAcceptedApplication(jobId: string): Promise<JobApplication | null> {
         return this.applicationModel.findOne({ job: jobId, status: ApplicationStatus.ACCEPTED })
-            .populate('subcontractor', 'fullName email primaryTrade profileImage')
+            .populate('subcontractor', 'fullName email primaryTrade hourlyRate yearsOfExperience cityLocation averageRating profileImage professionalBio')
             .exec();
     }
 

@@ -155,7 +155,7 @@ export class OfferService {
         offers.map(async (offer) => {
           const offerObj = offer.toObject();
           const jobId = offerObj.job?._id?.toString();
-          
+
           if (jobId) {
             try {
               const compliance = await this.complianceService.getComplianceByProject(jobId);
@@ -171,7 +171,7 @@ export class OfferService {
               };
             }
           }
-          
+
           return {
             ...offerObj,
             compliance: null,
@@ -191,7 +191,7 @@ export class OfferService {
   async getOffersForJob(jobId: string): Promise<Offer[]> {
     return await this.offerModel
       .find({ job: new Types.ObjectId(jobId) })
-      .populate('subcontractor', 'fullName email primaryTrade hourlyRate profileImage')
+      .populate('subcontractor', 'fullName email primaryTrade hourlyRate yearsOfExperience cityLocation averageRating profileImage professionalBio')
       .sort({ sentAt: -1 })
       .exec();
   }
@@ -199,7 +199,7 @@ export class OfferService {
   async getAcceptedOffer(jobId: string): Promise<Offer | null> {
     return await this.offerModel
       .findOne({ job: new Types.ObjectId(jobId), status: OfferStatus.ACCEPTED })
-      .populate('subcontractor', 'fullName email primaryTrade hourlyRate profileImage')
+      .populate('subcontractor', 'fullName email primaryTrade hourlyRate yearsOfExperience cityLocation averageRating profileImage professionalBio')
       .exec();
   }
 

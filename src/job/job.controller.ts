@@ -166,13 +166,18 @@ export class JobController {
     }
 
     if (isOwner) {
-      applications = await this.jobApplicationService.getApplicationsForJob(id, req.user.sub);
+      const [fetchedApplications, offers] = await Promise.all([
+        this.jobApplicationService.getApplicationsForJob(id, req.user.sub),
+        this.offerService.getOffersForJob(id),
+      ]);
+      applications = fetchedApplications;
 
       return {
         message: 'Job retrieved successfully',
         data: {
           ...job.toObject(),
           applications,
+          offers,
           assignedApplication,
         },
       };

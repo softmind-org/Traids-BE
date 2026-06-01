@@ -11,6 +11,6 @@ export class LoginDto {
 
   @IsString()
   @IsNotEmpty()
-  @IsIn(['company', 'subcontractor'])
-  userType: 'company' | 'subcontractor';
+  @IsIn(['company', 'subcontractor', 'admin'])
+  userType: 'company' | 'subcontractor' | 'admin';
 }

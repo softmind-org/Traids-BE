@@ -20,6 +20,7 @@ import { InvoiceModule } from './invoice/invoice.module';
 import { HmrcModule } from './hmrc/hmrc.module';
 import { CisModule } from './cis/cis.module';
 import { RatingModule } from './rating/rating.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { RatingModule } from './rating/rating.module';
     HmrcModule,
     CisModule,
     RatingModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

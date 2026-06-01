@@ -3,10 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Company, CompanyDocument } from '../company/schema/company.schema';
-import {
-  Subcontractor,
-  SubcontractorDocument,
-} from '../subcontractor/schema/subcontractor.schema';
+import { Subcontractor, SubcontractorDocument } from '../subcontractor/schema/subcontractor.schema';
+import { Admin, AdminDocument } from '../admin/schema/admin.schema';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyResetTokenDto } from './dto/verify-reset-token.dto';
@@ -18,8 +16,8 @@ import * as bcrypt from 'bcrypt';
 export class AuthService {
   constructor(
     @InjectModel(Company.name) private companyModel: Model<CompanyDocument>,
-    @InjectModel(Subcontractor.name)
-    private subcontractorModel: Model<SubcontractorDocument>,
+    @InjectModel(Subcontractor.name) private subcontractorModel: Model<SubcontractorDocument>,
+    @InjectModel(Admin.name) private adminModel: Model<AdminDocument>,
     private jwtService: JwtService,
     private emailService: EmailService,
   ) { }
@@ -33,8 +31,42 @@ export class AuthService {
       return this.loginCompany(loginDto.email, loginDto.password);
     } else if (loginDto.userType === 'subcontractor') {
       return this.loginSubcontractor(loginDto.email, loginDto.password);
+    } else if (loginDto.userType === 'admin') {
+      return this.loginAdmin(loginDto.email, loginDto.password);
     }
     return null;
+  }
+
+  private async loginAdmin(email: string, password: string): Promise<{
+    user: any;
+    accessToken: string;
+    userType: string;
+  } | null> {
+    const admin = await this.adminModel.findOne({ email: email.toLowerCase() });
+    if (!admin) return null;
+
+    if (!admin.isActive) {
+      throw new HttpException('Admin account is deactivated', HttpStatus.FORBIDDEN);
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, admin.password);
+    if (!isPasswordValid) return null;
+
+    await this.adminModel.findByIdAndUpdate(admin._id, { lastLoginAt: new Date() });
+
+    const payload = {
+      sub: admin._id,
+      email: admin.email,
+      fullName: admin.fullName,
+      role: admin.role,
+      isActive: admin.isActive,
+      userType: 'admin',
+    };
+
+    const accessToken = this.jwtService.sign(payload);
+    const { password: _, resetToken: __, resetTokenExpires: ___, ...adminData } = admin.toObject();
+
+    return { user: adminData, accessToken, userType: 'admin' };
   }
 
   private async loginCompany(
@@ -341,29 +373,22 @@ export class AuthService {
     throw new HttpException('Invalid user type', HttpStatus.BAD_REQUEST);
   }
 
-  async getProfile(userId: string, userType: 'company' | 'subcontractor'): Promise<any> {
+  async getProfile(userId: string, userType: 'company' | 'subcontractor' | 'admin'): Promise<any> {
     if (userType === 'company') {
-      const company = await this.companyModel
-        .findById(userId)
-        .select('-password')
-        .exec();
-
-      if (!company) {
-        throw new HttpException('Company not found', HttpStatus.NOT_FOUND);
-      }
-
+      const company = await this.companyModel.findById(userId).select('-password').exec();
+      if (!company) throw new HttpException('Company not found', HttpStatus.NOT_FOUND);
       return company;
     } else if (userType === 'subcontractor') {
-      const subcontractor = await this.subcontractorModel
-        .findById(userId)
-        .select('-password')
-        .exec();
-
-      if (!subcontractor) {
-        throw new HttpException('Subcontractor not found', HttpStatus.NOT_FOUND);
-      }
-
+      const subcontractor = await this.subcontractorModel.findById(userId).select('-password').exec();
+      if (!subcontractor) throw new HttpException('Subcontractor not found', HttpStatus.NOT_FOUND);
       return subcontractor;
+    } else if (userType === 'admin') {
+      const admin = await this.adminModel
+        .findById(userId)
+        .select('-password -resetToken -resetTokenExpires')
+        .exec();
+      if (!admin) throw new HttpException('Admin not found', HttpStatus.NOT_FOUND);
+      return admin;
     }
 
     throw new HttpException('Invalid user type', HttpStatus.BAD_REQUEST);

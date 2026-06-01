@@ -13,7 +13,7 @@ import { Conversation, ConversationSchema } from '../chat/schema/conversation.sc
   imports: [
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      signOptions: { expiresIn: '7d' },
+      signOptions: { expiresIn: '24h' },
     }),
     NotificationModule,
     MongooseModule.forFeature([{ name: Conversation.name, schema: ConversationSchema }]),

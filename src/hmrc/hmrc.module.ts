@@ -12,7 +12,7 @@ import { Subcontractor, SubcontractorSchema } from '../subcontractor/schema/subc
     HttpModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      signOptions: { expiresIn: '7d' },
+      signOptions: { expiresIn: '24h' },
     }),
     MongooseModule.forFeature([
       { name: Company.name, schema: CompanySchema },

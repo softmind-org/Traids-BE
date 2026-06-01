@@ -18,7 +18,7 @@ import { CommonModule } from '../common/common.module';
     ]),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      signOptions: { expiresIn: '7d' },
+      signOptions: { expiresIn: '24h' },
     }),
     CommonModule,
   ],

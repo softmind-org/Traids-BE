@@ -19,7 +19,7 @@ import { StripeModule } from '../stripe/stripe.module';
         ]),
         JwtModule.register({
             secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-            signOptions: { expiresIn: '7d' },
+            signOptions: { expiresIn: '24h' },
         }),
         StripeModule,
     ],

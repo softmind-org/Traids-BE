@@ -26,6 +26,7 @@ import { CommonModule } from '../common/common.module';
     }),
     CommonModule,
   ],
+  //comment
   controllers: [ChatController],
   providers: [ChatService, SocketService],
   exports: [ChatService],

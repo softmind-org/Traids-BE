@@ -504,7 +504,7 @@ export class CompanyService {
     const onTimeCompletionPercent =
       totalForOnTime > 0
         ? parseFloat(((completedJobs / totalForOnTime) * 100).toFixed(1))
-        : 100;
+        : null;
 
     return {
       totalSpendYTD: {

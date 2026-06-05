@@ -5,8 +5,6 @@ import {
   Body,
   Request,
   UseGuards,
-  HttpException,
-  HttpStatus,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -22,13 +20,6 @@ export class AuthController {
   @Post('login')
   async login(@Body() loginDto: LoginDto) {
     const result = await this.authService.login(loginDto);
-
-    if (!result) {
-      throw new HttpException(
-        'Invalid email or password',
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
 
     return {
       message: 'Login successful',

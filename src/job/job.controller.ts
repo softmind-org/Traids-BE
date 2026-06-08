@@ -218,10 +218,11 @@ export class JobController {
     };
   }
 
+  //comment aded
+
 
   /**
-   * 
-   * Complete a job manually
+   * Complete a job manually 
    * POST /jobs/:id/complete
    */
   @Post(':id/complete')

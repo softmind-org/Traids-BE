@@ -220,6 +220,7 @@ export class JobController {
 
 
   /**
+   * 
    * Complete a job manually
    * POST /jobs/:id/complete
    */

@@ -42,16 +42,7 @@ export class JobApplicationService {
             throw new BadRequestException('This job is no longer accepting applications');
         }
 
-        // 3. Check if job start date hasn't passed (today is still allowed)
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const jobStartDay = new Date(job.timelineStartDate);
-        jobStartDay.setHours(0, 0, 0, 0);
-        if (today > jobStartDay) {
-            throw new BadRequestException('Job start date has already passed');
-        }
-
-        // 4. Check for duplicate application
+        // 3. Check for duplicate application
         const existingApplication = await this.applicationModel.findOne({
             job: new Types.ObjectId(createApplicationDto.jobId),
             subcontractor: new Types.ObjectId(subcontractorId),

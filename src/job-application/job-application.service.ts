@@ -111,7 +111,7 @@ export class JobApplicationService {
             }
 
             // 2. Fetch applications for the job
-            const query: any = { job: jobId };
+            const query: any = { job: new Types.ObjectId(jobId) };
 
             if (status) {
                 query.status = status;
@@ -134,7 +134,7 @@ export class JobApplicationService {
     }
 
     async getAcceptedApplication(jobId: string): Promise<JobApplication | null> {
-        return this.applicationModel.findOne({ job: jobId, status: ApplicationStatus.ACCEPTED })
+        return this.applicationModel.findOne({ job: new Types.ObjectId(jobId), status: ApplicationStatus.ACCEPTED })
             .populate('subcontractor', 'fullName email primaryTrade hourlyRate yearsOfExperience cityLocation averageRating profileImage professionalBio')
             .exec();
     }

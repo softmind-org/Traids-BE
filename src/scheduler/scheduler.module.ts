@@ -6,7 +6,6 @@ import { JobSchedulerService } from './job-scheduler.service';
 import { TimesheetSchedulerService } from './timesheet-scheduler.service';
 import { StripeSchedulerService } from './stripe-scheduler.service';
 import { CisSchedulerService } from './cis-scheduler.service';
-import { Job, JobSchema } from '../job/schema/job.schema';
 import { Invoice, InvoiceSchema } from '../invoice/schema/invoice.schema';
 import { Subcontractor, SubcontractorSchema } from '../subcontractor/schema/subcontractor.schema';
 import { Timesheet, TimesheetSchema } from '../timesheet/schema/timesheet.schema';
@@ -19,7 +18,6 @@ import { CisModule } from '../cis/cis.module';
   imports: [
     ScheduleModule.forRoot(),
     MongooseModule.forFeature([
-      { name: Job.name, schema: JobSchema },
       { name: Invoice.name, schema: InvoiceSchema },
       { name: Subcontractor.name, schema: SubcontractorSchema },
       { name: Timesheet.name, schema: TimesheetSchema },

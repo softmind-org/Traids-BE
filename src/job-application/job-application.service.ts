@@ -1,6 +1,6 @@
 import { Injectable, HttpException, HttpStatus, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { JobApplication, JobApplicationDocument, ApplicationStatus } from './schema/job-application.schema';
 import { Job, JobDocument } from '../job/schema/job.schema';
 import { Subcontractor, SubcontractorDocument } from '../subcontractor/schema/subcontractor.schema';
@@ -53,8 +53,8 @@ export class JobApplicationService {
 
         // 4. Check for duplicate application
         const existingApplication = await this.applicationModel.findOne({
-            job: createApplicationDto.jobId,
-            subcontractor: subcontractorId,
+            job: new Types.ObjectId(createApplicationDto.jobId),
+            subcontractor: new Types.ObjectId(subcontractorId),
         });
 
         if (existingApplication) {
@@ -78,8 +78,8 @@ export class JobApplicationService {
 
         // 7. Create application
         const application = new this.applicationModel({
-            job: createApplicationDto.jobId,
-            subcontractor: subcontractorId,
+            job: new Types.ObjectId(createApplicationDto.jobId),
+            subcontractor: new Types.ObjectId(subcontractorId),
             company: job.company,
             fullName: createApplicationDto.fullName,
             proposedDailyRate: createApplicationDto.proposedDailyRate,
@@ -258,9 +258,6 @@ export class JobApplicationService {
         companyId: string,
         application: JobApplication,
     ): Promise<void> {
-        // Fetch subcontractor details
-        const subcontractor = await this.subcontractorModel.findById(application.subcontractor).exec();
-
         // Use CompanySocketService for company notifications
         this.companySocketService.notifyNewJobApplication(companyId, {
             applicationId: (application as any)._id,

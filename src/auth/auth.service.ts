@@ -28,13 +28,13 @@ export class AuthService {
     user: any;
     accessToken: string;
     userType: string;
-  } | null> {
+  }> {
     if (loginDto.userType === 'company') {
       return this.loginCompany(loginDto.email, loginDto.password);
     } else if (loginDto.userType === 'subcontractor') {
       return this.loginSubcontractor(loginDto.email, loginDto.password);
     }
-    return null;
+    throw new HttpException('Invalid user type', HttpStatus.BAD_REQUEST);
   }
 
   private async loginCompany(
@@ -44,19 +44,19 @@ export class AuthService {
     user: any;
     accessToken: string;
     userType: string;
-  } | null> {
+  }> {
     const company = await this.companyModel
       .findOne({ workEmail: email })
       .exec();
 
     if (!company) {
-      return null;
+      throw new HttpException('No account found with this email address', HttpStatus.NOT_FOUND);
     }
 
     const isPasswordValid = await bcrypt.compare(password, company.password);
 
     if (!isPasswordValid) {
-      return null;
+      throw new HttpException('Incorrect password', HttpStatus.UNAUTHORIZED);
     }
 
     const payload = {
@@ -79,13 +79,13 @@ export class AuthService {
     user: any;
     accessToken: string;
     userType: string;
-  } | null> {
+  }> {
     const subcontractor = await this.subcontractorModel
       .findOne({ email: email })
       .exec();
 
     if (!subcontractor) {
-      return null;
+      throw new HttpException('No account found with this email address', HttpStatus.NOT_FOUND);
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -94,7 +94,7 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
-      return null;
+      throw new HttpException('Incorrect password', HttpStatus.UNAUTHORIZED);
     }
 
     const payload = {

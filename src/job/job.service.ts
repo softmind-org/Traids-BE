@@ -128,14 +128,8 @@ export class JobService {
         query.trade = filters.trade.length === 1 ? filters.trade[0] : { $in: filters.trade };
       }
 
-      // Filter by hourly rate - find jobs near the maximum hourly rate
-      // Looking for jobs within ±10 of the max rate or less than max rate
       if (filters.maxHourlyRate) {
-        const rateRange = 10; // £10 range
-        query.hourlyRate = {
-          $gte: Math.max(0, filters.maxHourlyRate - rateRange),
-          $lte: filters.maxHourlyRate,
-        };
+        query.hourlyRate = { $lte: filters.maxHourlyRate };
       }
 
       // Filter by location (case-insensitive partial match)

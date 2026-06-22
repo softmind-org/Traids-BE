@@ -73,4 +73,27 @@ export class TimesheetSchedulerService {
             this.logger.error(`Auto-approve scheduler failed: ${err.message}`);
         }
     }
+
+    /**
+     * Runs every Sunday at 23:00.
+     * Auto-submits any DRAFT timesheet for the week that is ending tonight,
+     * so subcontractors who forgot to submit don't block the approval/invoice flow.
+     */
+    @Cron('0 0 23 * * 0')
+    async handleWeeklyAutoSubmit(): Promise<void> {
+        this.logger.log('Running weekly timesheet auto-submit job...');
+
+        try {
+            const autoSubmitted = await this.timesheetService.autoSubmitPendingTimesheets();
+
+            if (autoSubmitted.length === 0) {
+                this.logger.log('No pending draft timesheets found for auto-submit.');
+                return;
+            }
+
+            this.logger.log(`Auto-submitted ${autoSubmitted.length} timesheet(s).`);
+        } catch (err) {
+            this.logger.error(`Weekly auto-submit scheduler failed: ${err.message}`);
+        }
+    }
 }

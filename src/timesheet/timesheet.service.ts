@@ -69,32 +69,20 @@ export class TimesheetService {
     }
 
     /**
-     * Compute which week number (1-based, relative to job start) a given date falls into.
-     * Week boundaries are based on job's timelineStartDate, each week is 7 days.
+     * Get the Monday (UTC midnight) of the calendar week containing the given date.
+     * Pure calendar calculation — does not depend on the job's timeline, since
+     * work can be logged before or after the job's planned start/end dates.
      */
-    private getWeekNumber(jobStartDate: Date, targetDate: Date): number {
-        const msPerDay = 1000 * 60 * 60 * 24;
-        const daysDiff = Math.floor(
-            (targetDate.getTime() - jobStartDate.getTime()) / msPerDay,
-        );
-        if (daysDiff < 0) {
-            throw new HttpException(
-                'Date is before the job start date',
-                HttpStatus.BAD_REQUEST,
-            );
-        }
-        return Math.floor(daysDiff / 7) + 1;
-    }
-
-    /**
-     * Get the Monday-like start of the week for a given date relative to job start.
-     * Week 1 starts on job start date, each next week starts 7 days later.
-     */
-    private getWeekStartDate(jobStartDate: Date, weekNumber: number): Date {
-        const weekStart = new Date(jobStartDate);
-        weekStart.setDate(weekStart.getDate() + (weekNumber - 1) * 7);
-        weekStart.setHours(0, 0, 0, 0);
-        return weekStart;
+    private getWeekStartDate(targetDate: Date): Date {
+        const d = new Date(Date.UTC(
+            targetDate.getUTCFullYear(),
+            targetDate.getUTCMonth(),
+            targetDate.getUTCDate(),
+        ));
+        const day = d.getUTCDay(); // 0 (Sun) - 6 (Sat)
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        d.setUTCDate(d.getUTCDate() + diffToMonday);
+        return d;
     }
 
     /**
@@ -187,14 +175,14 @@ export class TimesheetService {
         // Force strict UTC midnight to avoid local timezone shifts in the database output
         const targetDate = new Date(`${dto.date}T00:00:00.000Z`);
 
-        const weekNumber = dto.weekNumber ?? this.getWeekNumber(job.timelineStartDate, targetDate);
-        const weekStartDate = this.getWeekStartDate(job.timelineStartDate, weekNumber);
+        const weekStartDate = this.getWeekStartDate(targetDate);
+        const jobObjId = new Types.ObjectId(dto.jobId);
 
-        // Find or create the timesheet for this week
+        // Find the timesheet covering this calendar week for this subcontractor on this job
         let timesheet = await this.timesheetModel.findOne({
-            job: new Types.ObjectId(dto.jobId),
+            job: jobObjId,
             subcontractor: subObjId,
-            weekNumber,
+            weekStartDate,
         });
 
         if (timesheet) {
@@ -208,13 +196,20 @@ export class TimesheetService {
         } else {
             // Resolve the hourly rate for this subcontractor
             const hourlyRate = await this.resolveHourlyRate(
-                new Types.ObjectId(dto.jobId),
+                jobObjId,
                 subObjId,
                 job.hourlyRate,
             );
 
+            // weekNumber is simply this subcontractor's Nth timesheet on this job
+            const existingCount = await this.timesheetModel.countDocuments({
+                job: jobObjId,
+                subcontractor: subObjId,
+            });
+            const weekNumber = dto.weekNumber ?? existingCount + 1;
+
             timesheet = new this.timesheetModel({
-                job: new Types.ObjectId(dto.jobId),
+                job: jobObjId,
                 subcontractor: subObjId,
                 company: job.company,
                 weekStartDate,
@@ -497,6 +492,50 @@ export class TimesheetService {
         }
 
         return autoApproved;
+    }
+
+    /**
+     * Called by the scheduler every Sunday night.
+     * Auto-submits any DRAFT timesheet belonging to the week that is ending
+     * (i.e. weekStartDate = Monday of the current calendar week), so
+     * subcontractors who forgot to submit don't block invoicing.
+     * Timesheets with no logged hours are left untouched (nothing to submit).
+     */
+    async autoSubmitPendingTimesheets(): Promise<TimesheetDocument[]> {
+        const now = new Date();
+        const currentWeekStartDate = this.getWeekStartDate(now);
+
+        const pending = await this.timesheetModel.find({
+            status: TimesheetStatus.DRAFT,
+            weekStartDate: currentWeekStartDate,
+            'dailyLogs.0': { $exists: true }, // has at least one logged day
+        });
+
+        if (pending.length === 0) return [];
+
+        const reviewExpiry = new Date(now);
+        reviewExpiry.setHours(reviewExpiry.getHours() + this.REVIEW_WINDOW_HOURS);
+
+        const autoSubmitted: TimesheetDocument[] = [];
+
+        for (const timesheet of pending) {
+            timesheet.dailyLogs.forEach((log) => {
+                log.isLocked = true;
+            });
+            timesheet.status = TimesheetStatus.SUBMITTED;
+            timesheet.submittedAt = now;
+            timesheet.reviewWindowExpiry = reviewExpiry;
+            this.recalculateTotals(timesheet);
+
+            await timesheet.save();
+            autoSubmitted.push(timesheet);
+
+            this.logger.log(
+                `Auto-submitted timesheet ${timesheet._id} for job ${timesheet.job} week ${timesheet.weekNumber}`,
+            );
+        }
+
+        return autoSubmitted;
     }
 
     /**

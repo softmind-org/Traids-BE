@@ -5,6 +5,7 @@ import { JobApplicationService } from './job-application.service';
 import { JobApplication, JobApplicationSchema } from './schema/job-application.schema';
 import { Job, JobSchema } from '../job/schema/job.schema';
 import { Subcontractor, SubcontractorSchema } from '../subcontractor/schema/subcontractor.schema';
+import { Offer, OfferSchema } from '../offer/schema/offer.schema';
 import { SocketModule } from '../socket/socket.module';
 import { JwtModule } from '@nestjs/jwt';
 import { CommonModule } from '../common/common.module';
@@ -15,6 +16,7 @@ import { CommonModule } from '../common/common.module';
             { name: JobApplication.name, schema: JobApplicationSchema },
             { name: Job.name, schema: JobSchema },
             { name: Subcontractor.name, schema: SubcontractorSchema },
+            { name: Offer.name, schema: OfferSchema },
         ]),
         SocketModule,
         JwtModule.register({

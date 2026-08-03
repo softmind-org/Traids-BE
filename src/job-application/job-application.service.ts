@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { JobApplication, JobApplicationDocument, ApplicationStatus } from './schema/job-application.schema';
 import { Job, JobDocument } from '../job/schema/job.schema';
 import { Subcontractor, SubcontractorDocument } from '../subcontractor/schema/subcontractor.schema';
+import { Offer, OfferDocument, OfferStatus } from '../offer/schema/offer.schema';
 import { CreateJobApplicationDto } from './dto/create-job-application.dto';
 import { S3UploadService } from '../common/service/s3-upload.service';
 import { CompanySocketService } from '../socket/companySocket.service';
@@ -15,6 +16,7 @@ export class JobApplicationService {
         @InjectModel(JobApplication.name) private applicationModel: Model<JobApplicationDocument>,
         @InjectModel(Job.name) private jobModel: Model<JobDocument>,
         @InjectModel(Subcontractor.name) private subcontractorModel: Model<SubcontractorDocument>,
+        @InjectModel(Offer.name) private offerModel: Model<OfferDocument>,
         private s3UploadService: S3UploadService,
         private companySocketService: CompanySocketService,
         private subcontractorSocketService: SubcontractorSocketService,
@@ -50,6 +52,20 @@ export class JobApplicationService {
 
         if (existingApplication) {
             throw new BadRequestException('You have already applied for this job');
+        }
+
+        // 4. Block the application if the company already offered this job to them —
+        // otherwise the same subcontractor shows up twice in Applicants & Requests
+        const existingOffer = await this.offerModel.findOne({
+            job: new Types.ObjectId(createApplicationDto.jobId),
+            subcontractor: new Types.ObjectId(subcontractorId),
+            status: { $in: [OfferStatus.PENDING, OfferStatus.ACCEPTED] },
+        });
+
+        if (existingOffer) {
+            throw new BadRequestException(
+                'You have already received an offer for this job. Please respond to the offer instead of applying',
+            );
         }
 
         // 5. Fetch subcontractor profile

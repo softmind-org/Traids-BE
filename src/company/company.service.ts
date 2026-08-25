@@ -167,14 +167,19 @@ export class CompanyService {
       updateData.password = await bcrypt.hash(updateDto.password, 10);
     }
 
+    // Handle profile image: a new upload wins, otherwise honour the remove flag
+    if (files?.profileImage?.length) {
+      updateData.profileImage = await this.s3UploadService.uploadFile(
+        files.profileImage[0],
+        'companies/profile-images',
+      );
+    } else if (updateDto.removeProfileImage === true) {
+      // Clear it so the client falls back to the placeholder
+      updateData.profileImage = null;
+    }
+
     // Handle file uploads
     if (files) {
-      if (files.profileImage?.length) {
-        updateData.profileImage = await this.s3UploadService.uploadFile(
-          files.profileImage[0],
-          'companies/profile-images',
-        );
-      }
 
       if (files.companyDocuments?.length) {
         updateData.companyDocuments = await this.s3UploadService.uploadMultipleFiles(

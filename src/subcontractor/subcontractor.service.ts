@@ -191,15 +191,19 @@ export class SubcontractorService {
       updateData.password = await bcrypt.hash(updateDto.newPassword, 10);
     }
 
+    // Handle profile image: a new upload wins, otherwise honour the remove flag
+    if (files?.profileImage?.length) {
+      updateData.profileImage = await this.s3UploadService.uploadFile(
+        files.profileImage[0],
+        'subcontractors/profile-images',
+      );
+    } else if (updateDto.removeProfileImage === true) {
+      // Clear it so the client falls back to the placeholder
+      updateData.profileImage = null;
+    }
+
     // Handle file uploads
     if (files) {
-      // Upload and update profile image
-      if (files.profileImage?.length) {
-        updateData.profileImage = await this.s3UploadService.uploadFile(
-          files.profileImage[0],
-          'subcontractors/profile-images',
-        );
-      }
 
       // Upload and replace insurance documents
       if (files.insuranceDocuments?.length) {

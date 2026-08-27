@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
+import { jwtModuleOptions } from '../common/constants/jwt.constants';
 import { Offer, OfferSchema } from './schema/offer.schema';
 import { Job, JobSchema } from '../job/schema/job.schema';
 import { Subcontractor, SubcontractorSchema } from '../subcontractor/schema/subcontractor.schema';
@@ -21,10 +22,7 @@ import { SocketModule } from '../socket/socket.module';
       { name: Company.name, schema: CompanySchema },
       { name: JobApplication.name, schema: JobApplicationSchema },
     ]),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      signOptions: { expiresIn: '24h' },
-    }),
+    JwtModule.register(jwtModuleOptions),
     CommonModule,
     ComplianceModule,
     SocketModule,

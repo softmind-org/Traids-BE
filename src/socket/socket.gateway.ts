@@ -11,6 +11,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { JWT_SECRET } from '../common/constants/jwt.constants';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Conversation, ConversationDocument } from '../chat/schema/conversation.schema';
@@ -57,7 +58,7 @@ export class SocketGateway
 
       // Verify JWT token
       const payload = this.jwtService.verify(token, {
-        secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+        secret: JWT_SECRET,
       });
 
       const userId = payload.sub;

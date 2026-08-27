@@ -1,5 +1,6 @@
 import { Module, Global } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { jwtModuleOptions } from '../common/constants/jwt.constants';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SocketGateway } from './socket.gateway';
 import { SocketService } from './socket.service';
@@ -11,10 +12,7 @@ import { Conversation, ConversationSchema } from '../chat/schema/conversation.sc
 @Global() // Makes this module available globally without importing
 @Module({
   imports: [
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      signOptions: { expiresIn: '24h' },
-    }),
+    JwtModule.register(jwtModuleOptions),
     NotificationModule,
     MongooseModule.forFeature([{ name: Conversation.name, schema: ConversationSchema }]),
   ],

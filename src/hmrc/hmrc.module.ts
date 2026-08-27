@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HttpModule } from '@nestjs/axios';
 import { JwtModule } from '@nestjs/jwt';
+import { jwtModuleOptions } from '../common/constants/jwt.constants';
 import { HmrcService } from './hmrc.service';
 import { HmrcController } from './hmrc.controller';
 import { Company, CompanySchema } from '../company/schema/company.schema';
@@ -10,10 +11,7 @@ import { Subcontractor, SubcontractorSchema } from '../subcontractor/schema/subc
 @Module({
   imports: [
     HttpModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      signOptions: { expiresIn: '24h' },
-    }),
+    JwtModule.register(jwtModuleOptions),
     MongooseModule.forFeature([
       { name: Company.name, schema: CompanySchema },
       { name: Subcontractor.name, schema: SubcontractorSchema },

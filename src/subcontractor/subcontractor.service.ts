@@ -78,7 +78,7 @@ export class SubcontractorService {
       profileImage?: Express.Multer.File[];
       workExamples?: Express.Multer.File[];
     },
-  ): Promise<Subcontractor> {
+  ): Promise<{ user: any; accessToken: string; userType: string }> {
     const hashedPassword = await bcrypt.hash(signUpSubcontractorDto.password, 10);
 
     let profileImageUrl: string | undefined;
@@ -148,7 +148,23 @@ export class SubcontractorService {
       console.error('Stripe Express account creation failed:', err.message);
     }
 
-    return saved;
+    // Re-read so the returned profile carries stripeAccountId set just above
+    const subcontractor = await this.subcontractorModel
+      .findById(saved._id)
+      .select('-password -resetToken -resetTokenExpires')
+      .exec();
+
+    // Sign the new subcontractor straight in — no separate login round-trip
+    // needed. Payload must match loginSubcontractor() in auth.service.ts.
+    const accessToken = this.jwtService.sign({
+      sub: saved._id,
+      email: saved.email,
+      fullName: saved.fullName,
+      primaryTrade: saved.primaryTrade,
+      userType: 'subcontractor',
+    });
+
+    return { user: subcontractor, accessToken, userType: 'subcontractor' };
   }
 
   async findByEmail(email: string): Promise<Subcontractor | null> {

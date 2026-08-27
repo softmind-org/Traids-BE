@@ -1,6 +1,7 @@
 import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtService } from '@nestjs/jwt';
+import { JWT_SECRET } from '../../common/constants/jwt.constants';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -24,7 +25,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     try {
       const payload = this.jwtService.verify(token, {
-        secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+        secret: JWT_SECRET,
       });
       request.user = payload;
       return true;

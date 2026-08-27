@@ -8,6 +8,7 @@ import { Subcontractor, SubcontractorSchema } from '../subcontractor/schema/subc
 import { Offer, OfferSchema } from '../offer/schema/offer.schema';
 import { SocketModule } from '../socket/socket.module';
 import { JwtModule } from '@nestjs/jwt';
+import { jwtModuleOptions } from '../common/constants/jwt.constants';
 import { CommonModule } from '../common/common.module';
 
 @Module({
@@ -19,10 +20,7 @@ import { CommonModule } from '../common/common.module';
             { name: Offer.name, schema: OfferSchema },
         ]),
         SocketModule,
-        JwtModule.register({
-            secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-            signOptions: { expiresIn: '24h' },
-        }),
+        JwtModule.register(jwtModuleOptions),
         CommonModule,
     ],
     controllers: [JobApplicationController],

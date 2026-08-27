@@ -1,3 +1,8 @@
+// Must be the first import: ConfigModule.forRoot() only runs once AppModule's
+// decorator is evaluated, which is *after* every feature module (and therefore
+// jwt.constants.ts) has already been imported and read process.env. Loading
+// dotenv here makes .env available before any of that happens.
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';

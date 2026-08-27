@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
+import { jwtModuleOptions } from '../common/constants/jwt.constants';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 import { Admin, AdminSchema } from './schema/admin.schema';
@@ -20,10 +21,7 @@ import { Rating, RatingSchema } from '../rating/schema/rating.schema';
       { name: Invoice.name, schema: InvoiceSchema },
       { name: Rating.name, schema: RatingSchema },
     ]),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      signOptions: { expiresIn: '24h' },
-    }),
+    JwtModule.register(jwtModuleOptions),
   ],
   controllers: [AdminController],
   providers: [AdminService],

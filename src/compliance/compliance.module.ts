@@ -5,16 +5,14 @@ import { ComplianceService } from './compliance.service';
 import { Compliance, ComplianceSchema } from './schema/compliance.schema';
 import { CommonModule } from '../common/common.module';
 import { JwtModule } from '@nestjs/jwt';
+import { jwtModuleOptions } from '../common/constants/jwt.constants';
 
 @Module({
     imports: [
         MongooseModule.forFeature([
             { name: Compliance.name, schema: ComplianceSchema },
         ]),
-        JwtModule.register({
-            secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-            signOptions: { expiresIn: '24h' },
-        }),
+        JwtModule.register(jwtModuleOptions),
         CommonModule,
     ],
     controllers: [ComplianceController],

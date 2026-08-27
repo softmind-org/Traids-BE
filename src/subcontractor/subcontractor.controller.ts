@@ -111,17 +111,20 @@ export class SubcontractorController {
       );
     }
 
-    const subcontractor = await this.subcontractorService.signUp(
-      signUpSubcontractorDto,
-      files,
-    );
+    const { user, accessToken, userType } =
+      await this.subcontractorService.signUp(signUpSubcontractorDto, files);
 
     this.logger.log(
       `Subcontractor signup successful - Email: ${signUpSubcontractorDto.email}, Name: ${signUpSubcontractorDto.fullName}`,
     );
 
+    // Signup logs the subcontractor straight in, so the client can go to the
+    // dashboard without a second /auth/login call.
     return {
       message: 'Subcontractor registered successfully',
+      user,
+      accessToken,
+      userType,
     };
   }
 

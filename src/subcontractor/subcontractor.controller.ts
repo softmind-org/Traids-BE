@@ -208,6 +208,9 @@ export class SubcontractorController {
       // Filter offers by status
       const pendingOffers = offers.filter(offer => offer.status === 'pending');
 
+      // Every application made, any outcome — drives the "Requested" tab
+      const requested = await this.subcontractorService.getMyApplications(subcontractorId);
+
       // Group assigned jobs by status
       const pendingJobs = assignedJobs.filter(job => job.status === 'pending');
       const inProgressJobs = assignedJobs.filter(job => job.status === 'in_progress');
@@ -220,6 +223,7 @@ export class SubcontractorController {
         pending: pendingJobs,
         inProgress: inProgressJobs,
         completed: completedJobs,
+        requested,
       };
     } catch (error) {
       this.logger.error(`Failed to fetch bookings: ${error.message}`);

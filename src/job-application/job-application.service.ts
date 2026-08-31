@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { JobApplication, JobApplicationDocument, ApplicationStatus } from './schema/job-application.schema';
@@ -51,7 +51,12 @@ export class JobApplicationService {
         });
 
         if (existingApplication) {
-            throw new BadRequestException('You have already applied for this job');
+            // 409 rather than 400: this is a state conflict, not a malformed
+            // request. Deliberately status-agnostic — a rejected or withdrawn
+            // application still blocks re-applying to the same job.
+            throw new ConflictException(
+                `You have already applied for this job (application status: ${existingApplication.status}).`,
+            );
         }
 
         // 4. Block the application if the company already offered this job to them —
@@ -259,6 +264,52 @@ export class JobApplicationService {
         );
 
         return application;
+    }
+
+    /**
+     * The logged-in subcontractor's application for a single job, if any.
+     * Used to drive the Apply button state on the job detail screen.
+     */
+    async getMyApplicationForJob(
+        jobId: string,
+        subcontractorId: string,
+    ): Promise<{ _id: any; status: ApplicationStatus; createdAt: Date } | null> {
+        const application = await this.applicationModel
+            .findOne({
+                job: new Types.ObjectId(jobId),
+                subcontractor: new Types.ObjectId(subcontractorId),
+            })
+            .select('status createdAt')
+            .lean();
+
+        if (!application) return null;
+
+        return {
+            _id: application._id,
+            status: application.status,
+            createdAt: (application as any).createdAt,
+        };
+    }
+
+    /**
+     * Which of the given jobs this subcontractor has already applied to.
+     * One query for the whole page rather than one per row.
+     */
+    async getAppliedJobIds(
+        subcontractorId: string,
+        jobIds: string[],
+    ): Promise<Set<string>> {
+        if (jobIds.length === 0) return new Set();
+
+        const applications = await this.applicationModel
+            .find({
+                subcontractor: new Types.ObjectId(subcontractorId),
+                job: { $in: jobIds.map((id) => new Types.ObjectId(id)) },
+            })
+            .select('job')
+            .lean();
+
+        return new Set(applications.map((a) => a.job.toString()));
     }
 
     private async notifyCompanyOfNewApplication(

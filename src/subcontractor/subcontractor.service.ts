@@ -547,6 +547,47 @@ export class SubcontractorService {
 
   // ─── RECOMMENDED JOBS ────────────────────────────────────────────
 
+  /**
+   * Every application this subcontractor has made, newest first, regardless of
+   * outcome (pending / accepted / rejected). Feeds the "Requested" tab, which
+   * is a history view — an accepted application therefore appears here as well
+   * as under Pending/In Progress, distinguished by its status.
+   */
+  async getMyApplications(subcontractorId: string) {
+    const applications = await this.jobApplicationModel
+      .find({ subcontractor: new Types.ObjectId(subcontractorId) })
+      .populate({
+        path: 'job',
+        select:
+          'jobTitle description siteAddress trade hourlyRate typeOfJob status workersRequired timelineStartDate timelineEndDate',
+        populate: {
+          path: 'company',
+          select: 'companyName workEmail phoneNumber headOfficeAddress profileImage',
+        },
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return (
+      applications
+        // Defensive: a deleted job leaves the application orphaned with a null
+        // populate, which would break the shared job-card transform.
+        .filter((application) => application.job)
+        .map((application) => ({
+          _id: application._id,
+          status: application.status,
+          createdAt: (application as any).createdAt,
+          appliedAt: application.appliedAt,
+          proposedDailyRate: application.proposedDailyRate,
+          message: application.message,
+          // Stored as applicationDocuments; exposed as documents to match the
+          // shape the client already renders.
+          documents: application.applicationDocuments ?? [],
+          job: application.job,
+        }))
+    );
+  }
+
   async getRecommendedJobs(subcontractorId: string) {
     const subObjId = new Types.ObjectId(subcontractorId);
 
@@ -580,6 +621,9 @@ export class SubcontractorService {
       .sort({ createdAt: -1 })
       .lean();
 
-    return jobs;
+    // Always false: the query above already excludes every job this
+    // subcontractor has applied to (_id: { $nin: appliedJobIds }). Included
+    // only so the client can use one card transform across all job lists.
+    return jobs.map((job) => ({ ...job, hasApplied: false }));
   }
 }

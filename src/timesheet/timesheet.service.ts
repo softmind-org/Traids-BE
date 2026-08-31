@@ -86,6 +86,33 @@ export class TimesheetService {
     }
 
     /**
+     * Derive the week number for a given week, relative to the job's timeline.
+     *
+     * Week 1 is the week containing the job's timelineStartDate, then every
+     * following Monday-to-Sunday block increments by one. Both sides of the
+     * calculation are normalised to their Monday (UTC), so the result is a
+     * pure function of the calendar date being logged — the client cannot
+     * disagree with it, which is the point: weekNumber and the logged date can
+     * no longer drift apart.
+     *
+     * Deliberately NOT clamped to a minimum of 1: weekNumber is half of the
+     * unique index {job, subcontractor, weekNumber}, so the mapping from week
+     * to number must stay one-to-one. Clamping would give two different weeks
+     * the same number and make the second one impossible to log. A date before
+     * the job's start week therefore yields 0 or a negative number — odd to
+     * display, but harmless, and only reachable by backdating more than a week
+     * before the job was started.
+     */
+    private getWeekNumber(weekStartDate: Date, timelineStartDate: Date): number {
+        const jobWeekStart = this.getWeekStartDate(new Date(timelineStartDate));
+        const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+        const diffWeeks = Math.round(
+            (weekStartDate.getTime() - jobWeekStart.getTime()) / MS_PER_WEEK,
+        );
+        return diffWeeks + 1;
+    }
+
+    /**
      * Determine the hourly rate for a subcontractor on a job.
      * Priority: JobApplication.proposedDailyRate → Offer → Job.hourlyRate
      */
@@ -201,12 +228,15 @@ export class TimesheetService {
                 job.hourlyRate,
             );
 
-            // weekNumber is simply this subcontractor's Nth timesheet on this job
-            const existingCount = await this.timesheetModel.countDocuments({
-                job: jobObjId,
-                subcontractor: subObjId,
-            });
-            const weekNumber = dto.weekNumber ?? existingCount + 1;
+            // weekNumber is derived from the calendar week being logged, relative
+            // to the job's timeline. Deliberately ignores dto.weekNumber: a
+            // client-supplied number could disagree with dto.date, which would
+            // mislabel the week permanently (the label drives invoice grouping
+            // and the unique index). Deriving it removes that failure mode.
+            const weekNumber = this.getWeekNumber(
+                weekStartDate,
+                job.timelineStartDate,
+            );
 
             timesheet = new this.timesheetModel({
                 job: jobObjId,
@@ -256,7 +286,23 @@ export class TimesheetService {
         // Recalculate totals
         this.recalculateTotals(timesheet);
 
-        return timesheet.save();
+        try {
+            return await timesheet.save();
+        } catch (err) {
+            // Unique index {job, subcontractor, weekNumber}. Reachable when a
+            // timesheet created under the old numbering already occupies the
+            // derived weekNumber for a different week. Surface it as a 409 so
+            // the UI can show something useful instead of a raw 500.
+            if (err?.code === 11000) {
+                throw new HttpException(
+                    `A timesheet already exists for week ${timesheet.weekNumber} on this job. ` +
+                    `This can happen if an earlier timesheet was saved under a different week numbering — ` +
+                    `please contact support so it can be corrected.`,
+                    HttpStatus.CONFLICT,
+                );
+            }
+            throw err;
+        }
     }
 
     /**
@@ -303,7 +349,34 @@ export class TimesheetService {
             );
         }
 
+        // Belt-and-braces: calculateHours() already rejects checkOut <= checkIn,
+        // so any stored log carries > 0 hours and the guard above should cover
+        // this. Kept explicit so a zero-hour timesheet can never be submitted
+        // even if hours are ever written by another path.
+        this.recalculateTotals(timesheet);
+        if (timesheet.totalHours <= 0) {
+            throw new HttpException(
+                'Cannot submit a timesheet with zero total hours',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
         const now = new Date();
+
+        // Only the current calendar week may be submitted, matching the UI.
+        const currentWeekStart = this.getWeekStartDate(now);
+        const timesheetWeekStart = this.getWeekStartDate(
+            new Date(timesheet.weekStartDate),
+        );
+        if (timesheetWeekStart.getTime() !== currentWeekStart.getTime()) {
+            const isPast = timesheetWeekStart.getTime() < currentWeekStart.getTime();
+            throw new HttpException(
+                isPast
+                    ? 'This week has already passed and can no longer be submitted'
+                    : 'A future week cannot be submitted yet',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
         const reviewExpiry = new Date(now);
         reviewExpiry.setHours(reviewExpiry.getHours() + this.REVIEW_WINDOW_HOURS);
 

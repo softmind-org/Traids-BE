@@ -20,9 +20,17 @@ export class LogHoursDto {
     })
     checkOut: string; // "05:00 PM"
 
+    /**
+     * @deprecated Ignored by the server.
+     *
+     * weekNumber is now derived from `date` relative to the job's
+     * timelineStartDate, so a client value can no longer disagree with the day
+     * being logged. Still accepted (and validated) so existing clients that
+     * send it are not rejected by the global forbidNonWhitelisted pipe.
+     */
     @IsOptional()
     @IsInt()
     @Min(1)
     @Type(() => Number)
-    weekNumber?: number; // optional — backend calculates if not provided
+    weekNumber?: number;
 }

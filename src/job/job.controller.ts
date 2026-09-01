@@ -70,7 +70,7 @@ export class JobController {
 
   @Get('available')
   @UseGuards(JwtAuthGuard, SubcontractorGuard)
-  async getAvailableJobs(@Query() filterJobsDto: FilterJobsDto) {
+  async getAvailableJobs(@Query() filterJobsDto: FilterJobsDto, @Request() req) {
     const filters = {
       trade: filterJobsDto.trade,
       maxHourlyRate: filterJobsDto.maxHourlyRate,
@@ -80,6 +80,7 @@ export class JobController {
     };
 
     const result = await this.jobService.getAllJobsWithFilters(filters);
+    const data = await this.withHasApplied(result.jobs, req.user.sub);
 
     return {
       message: 'Available jobs retrieved successfully',
@@ -87,17 +88,18 @@ export class JobController {
       total: result.total,
       page: result.page,
       totalPages: result.totalPages,
-      data: result.jobs,
+      data,
     };
   }
 
   @Get('search')
   @UseGuards(JwtAuthGuard, SubcontractorGuard)
-  async searchAvailableJobs(@Query() searchJobsDto: SearchJobsDto) {
+  async searchAvailableJobs(@Query() searchJobsDto: SearchJobsDto, @Request() req) {
     const result = await this.jobService.searchAvailableJobs(
       searchJobsDto.q,
       searchJobsDto.page,
     );
+    const data = await this.withHasApplied(result.jobs, req.user.sub);
 
     return {
       message: 'Search results retrieved successfully',
@@ -105,8 +107,24 @@ export class JobController {
       total: result.total,
       page: result.page,
       totalPages: result.totalPages,
-      data: result.jobs,
+      data,
     };
+  }
+
+  /**
+   * Annotate a page of jobs with whether this subcontractor has already
+   * applied, using a single lookup for the whole page.
+   */
+  private async withHasApplied(jobs: any[], subcontractorId: string) {
+    const appliedIds = await this.jobApplicationService.getAppliedJobIds(
+      subcontractorId,
+      jobs.map((j) => j._id.toString()),
+    );
+
+    return jobs.map((job) => ({
+      ...(typeof job.toObject === 'function' ? job.toObject() : job),
+      hasApplied: appliedIds.has(job._id.toString()),
+    }));
   }
 
   @Get(':id')
@@ -115,6 +133,18 @@ export class JobController {
     const job = await this.jobService.getJobById(id);
     const companyId = job.company['_id'] ? job.company['_id'].toString() : job.company.toString();
     const isOwner = req.user.userType === 'company' && companyId === req.user.sub;
+
+    // Apply-button state for the logged-in subcontractor. Computed once and
+    // merged into every response path below so the field is always present for
+    // a subcontractor, whatever branch the job falls into. Absent entirely for
+    // company/admin callers.
+    const isSubcontractor = req.user.userType === 'subcontractor';
+    const myApplication = isSubcontractor
+      ? await this.jobApplicationService.getMyApplicationForJob(id, req.user.sub)
+      : null;
+    const applicationState = isSubcontractor
+      ? { hasApplied: !!myApplication, myApplication }
+      : {};
 
     // Handle OFFER type jobs
     if (job.typeOfJob === 'offer') {
@@ -129,6 +159,7 @@ export class JobController {
             message: 'Job retrieved successfully',
             data: {
               ...job.toObject(),
+              ...applicationState,
               offers,
             },
           };
@@ -141,6 +172,7 @@ export class JobController {
             message: 'Job retrieved successfully',
             data: {
               ...job.toObject(),
+              ...applicationState,
               acceptedOffer,
             },
           };
@@ -152,7 +184,7 @@ export class JobController {
 
       return {
         message: 'Job retrieved successfully',
-        data: job,
+        data: { ...job.toObject(), ...applicationState },
       };
     }
 
@@ -176,6 +208,7 @@ export class JobController {
         message: 'Job retrieved successfully',
         data: {
           ...job.toObject(),
+          ...applicationState,
           applications,
           offers,
           assignedApplication,
@@ -189,6 +222,7 @@ export class JobController {
         message: 'Job retrieved successfully',
         data: {
           ...job.toObject(),
+          ...applicationState,
           assignedApplication,
         },
       };
@@ -196,7 +230,7 @@ export class JobController {
 
     return {
       message: 'Job retrieved successfully',
-      data: job,
+      data: { ...job.toObject(), ...applicationState },
     };
   }
 

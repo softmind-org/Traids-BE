@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
+import { jwtModuleOptions } from '../common/constants/jwt.constants';
 import { Company, CompanySchema } from './schema/company.schema';
 import { Job, JobSchema } from '../job/schema/job.schema';
 import { Timesheet, TimesheetSchema } from '../timesheet/schema/timesheet.schema';
@@ -20,10 +21,7 @@ import { StripeModule } from '../stripe/stripe.module';
       { name: Invoice.name, schema: InvoiceSchema },
       { name: Subcontractor.name, schema: SubcontractorSchema },
     ]),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-      signOptions: { expiresIn: '24h' },
-    }),
+    JwtModule.register(jwtModuleOptions),
     CommonModule,
     StripeModule,
   ],

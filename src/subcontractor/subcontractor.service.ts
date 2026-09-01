@@ -78,7 +78,7 @@ export class SubcontractorService {
       profileImage?: Express.Multer.File[];
       workExamples?: Express.Multer.File[];
     },
-  ): Promise<Subcontractor> {
+  ): Promise<{ user: any; accessToken: string; userType: string }> {
     const hashedPassword = await bcrypt.hash(signUpSubcontractorDto.password, 10);
 
     let profileImageUrl: string | undefined;
@@ -148,7 +148,23 @@ export class SubcontractorService {
       console.error('Stripe Express account creation failed:', err.message);
     }
 
-    return saved;
+    // Re-read so the returned profile carries stripeAccountId set just above
+    const subcontractor = await this.subcontractorModel
+      .findById(saved._id)
+      .select('-password -resetToken -resetTokenExpires')
+      .exec();
+
+    // Sign the new subcontractor straight in — no separate login round-trip
+    // needed. Payload must match loginSubcontractor() in auth.service.ts.
+    const accessToken = this.jwtService.sign({
+      sub: saved._id,
+      email: saved.email,
+      fullName: saved.fullName,
+      primaryTrade: saved.primaryTrade,
+      userType: 'subcontractor',
+    });
+
+    return { user: subcontractor, accessToken, userType: 'subcontractor' };
   }
 
   async findByEmail(email: string): Promise<Subcontractor | null> {
@@ -191,15 +207,19 @@ export class SubcontractorService {
       updateData.password = await bcrypt.hash(updateDto.newPassword, 10);
     }
 
+    // Handle profile image: a new upload wins, otherwise honour the remove flag
+    if (files?.profileImage?.length) {
+      updateData.profileImage = await this.s3UploadService.uploadFile(
+        files.profileImage[0],
+        'subcontractors/profile-images',
+      );
+    } else if (updateDto.removeProfileImage === true) {
+      // Clear it so the client falls back to the placeholder
+      updateData.profileImage = null;
+    }
+
     // Handle file uploads
     if (files) {
-      // Upload and update profile image
-      if (files.profileImage?.length) {
-        updateData.profileImage = await this.s3UploadService.uploadFile(
-          files.profileImage[0],
-          'subcontractors/profile-images',
-        );
-      }
 
       // Upload and replace insurance documents
       if (files.insuranceDocuments?.length) {
@@ -527,6 +547,47 @@ export class SubcontractorService {
 
   // ─── RECOMMENDED JOBS ────────────────────────────────────────────
 
+  /**
+   * Every application this subcontractor has made, newest first, regardless of
+   * outcome (pending / accepted / rejected). Feeds the "Requested" tab, which
+   * is a history view — an accepted application therefore appears here as well
+   * as under Pending/In Progress, distinguished by its status.
+   */
+  async getMyApplications(subcontractorId: string) {
+    const applications = await this.jobApplicationModel
+      .find({ subcontractor: new Types.ObjectId(subcontractorId) })
+      .populate({
+        path: 'job',
+        select:
+          'jobTitle description siteAddress trade hourlyRate typeOfJob status workersRequired timelineStartDate timelineEndDate',
+        populate: {
+          path: 'company',
+          select: 'companyName workEmail phoneNumber headOfficeAddress profileImage',
+        },
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return (
+      applications
+        // Defensive: a deleted job leaves the application orphaned with a null
+        // populate, which would break the shared job-card transform.
+        .filter((application) => application.job)
+        .map((application) => ({
+          _id: application._id,
+          status: application.status,
+          createdAt: (application as any).createdAt,
+          appliedAt: application.appliedAt,
+          proposedDailyRate: application.proposedDailyRate,
+          message: application.message,
+          // Stored as applicationDocuments; exposed as documents to match the
+          // shape the client already renders.
+          documents: application.applicationDocuments ?? [],
+          job: application.job,
+        }))
+    );
+  }
+
   async getRecommendedJobs(subcontractorId: string) {
     const subObjId = new Types.ObjectId(subcontractorId);
 
@@ -560,6 +621,9 @@ export class SubcontractorService {
       .sort({ createdAt: -1 })
       .lean();
 
-    return jobs;
+    // Always false: the query above already excludes every job this
+    // subcontractor has applied to (_id: { $nin: appliedJobIds }). Included
+    // only so the client can use one card transform across all job lists.
+    return jobs.map((job) => ({ ...job, hasApplied: false }));
   }
 }

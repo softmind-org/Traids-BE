@@ -267,6 +267,21 @@ export class OfferService {
         );
       }
 
+      // 6b. Block the offer if the subcontractor already applied for this job —
+      // otherwise the same subcontractor shows up twice in Applicants & Requests
+      const existingApplication = await this.jobApplicationModel.findOne({
+        job: new Types.ObjectId(jobId),
+        subcontractor: new Types.ObjectId(subcontractorId),
+        status: { $in: [ApplicationStatus.PENDING, ApplicationStatus.ACCEPTED] },
+      });
+
+      if (existingApplication) {
+        throw new HttpException(
+          'This subcontractor has already applied for this job. Review their application in Applicants & Requests instead of sending an offer',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
       // 7. Create the offer (without creating a new job)
       const offer = new this.offerModel({
         job: new Types.ObjectId(jobId),

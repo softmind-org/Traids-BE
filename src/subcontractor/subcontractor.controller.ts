@@ -111,17 +111,20 @@ export class SubcontractorController {
       );
     }
 
-    const subcontractor = await this.subcontractorService.signUp(
-      signUpSubcontractorDto,
-      files,
-    );
+    const { user, accessToken, userType } =
+      await this.subcontractorService.signUp(signUpSubcontractorDto, files);
 
     this.logger.log(
       `Subcontractor signup successful - Email: ${signUpSubcontractorDto.email}, Name: ${signUpSubcontractorDto.fullName}`,
     );
 
+    // Signup logs the subcontractor straight in, so the client can go to the
+    // dashboard without a second /auth/login call.
     return {
       message: 'Subcontractor registered successfully',
+      user,
+      accessToken,
+      userType,
     };
   }
 
@@ -205,6 +208,9 @@ export class SubcontractorController {
       // Filter offers by status
       const pendingOffers = offers.filter(offer => offer.status === 'pending');
 
+      // Every application made, any outcome — drives the "Requested" tab
+      const requested = await this.subcontractorService.getMyApplications(subcontractorId);
+
       // Group assigned jobs by status
       const pendingJobs = assignedJobs.filter(job => job.status === 'pending');
       const inProgressJobs = assignedJobs.filter(job => job.status === 'in_progress');
@@ -217,6 +223,7 @@ export class SubcontractorController {
         pending: pendingJobs,
         inProgress: inProgressJobs,
         completed: completedJobs,
+        requested,
       };
     } catch (error) {
       this.logger.error(`Failed to fetch bookings: ${error.message}`);

@@ -88,4 +88,9 @@ export class UpdateSubcontractorDto {
     @IsNumber()
     @IsIn([20, 30])
     cisDeductionRate?: 20 | 30;
+
+    @IsOptional()
+    @Transform(({ value }) => value === 'true' || value === true)
+    @IsBoolean()
+    removeProfileImage?: boolean;
 }

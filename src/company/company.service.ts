@@ -58,7 +58,7 @@ export class CompanyService {
       insuranceCertificate?: Express.Multer.File[];
       healthAndSafetyPolicy?: Express.Multer.File[];
     },
-  ): Promise<Company> {
+  ): Promise<{ user: any; accessToken: string; userType: string }> {
     // Hash the password before saving
     const hashedPassword = await bcrypt.hash(signUpCompanyDto.password, 10);
 
@@ -117,7 +117,22 @@ export class CompanyService {
       console.error('Stripe customer creation failed:', err.message);
     }
 
-    return saved;
+    // Re-read so the returned profile carries stripeCustomerId set just above
+    const company = await this.companyModel
+      .findById(saved._id)
+      .select('-password -resetToken -resetTokenExpires')
+      .exec();
+
+    // Sign the new company straight in — no separate login round-trip needed.
+    // Payload must match loginCompany() in auth.service.ts.
+    const accessToken = this.jwtService.sign({
+      sub: saved._id,
+      email: saved.workEmail,
+      companyName: saved.companyName,
+      userType: 'company',
+    });
+
+    return { user: company, accessToken, userType: 'company' };
   }
 
   async findByEmail(email: string): Promise<Company | null> {
@@ -167,14 +182,19 @@ export class CompanyService {
       updateData.password = await bcrypt.hash(updateDto.password, 10);
     }
 
+    // Handle profile image: a new upload wins, otherwise honour the remove flag
+    if (files?.profileImage?.length) {
+      updateData.profileImage = await this.s3UploadService.uploadFile(
+        files.profileImage[0],
+        'companies/profile-images',
+      );
+    } else if (updateDto.removeProfileImage === true) {
+      // Clear it so the client falls back to the placeholder
+      updateData.profileImage = null;
+    }
+
     // Handle file uploads
     if (files) {
-      if (files.profileImage?.length) {
-        updateData.profileImage = await this.s3UploadService.uploadFile(
-          files.profileImage[0],
-          'companies/profile-images',
-        );
-      }
 
       if (files.companyDocuments?.length) {
         updateData.companyDocuments = await this.s3UploadService.uploadMultipleFiles(

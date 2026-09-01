@@ -77,10 +77,18 @@ export class CompanyController {
       );
     }
 
-    const company = await this.companyService.signUp(signUpCompanyDto, files);
+    const { user, accessToken, userType } = await this.companyService.signUp(
+      signUpCompanyDto,
+      files,
+    );
 
+    // Signup logs the company straight in, so the client can go to the
+    // dashboard without a second /auth/login call.
     return {
       message: 'Company registered successfully',
+      user,
+      accessToken,
+      userType,
     };
   }
 

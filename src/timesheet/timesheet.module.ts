@@ -8,6 +8,7 @@ import { JobApplication, JobApplicationSchema } from '../job-application/schema/
 import { Offer, OfferSchema } from '../offer/schema/offer.schema';
 import { InvoiceModule } from '../invoice/invoice.module';
 import { JwtModule } from '@nestjs/jwt';
+import { jwtModuleOptions } from '../common/constants/jwt.constants';
 
 @Module({
     imports: [
@@ -18,10 +19,7 @@ import { JwtModule } from '@nestjs/jwt';
             { name: Offer.name, schema: OfferSchema },
         ]),
         InvoiceModule,
-        JwtModule.register({
-            secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
-            signOptions: { expiresIn: '24h' },
-        }),
+        JwtModule.register(jwtModuleOptions),
     ],
     controllers: [TimesheetController],
     providers: [TimesheetService],

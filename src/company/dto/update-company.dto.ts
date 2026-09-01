@@ -47,4 +47,9 @@ export class UpdateCompanyDto {
     @Transform(({ value }) => value === 'true' || value === true)
     @IsBoolean()
     timesheetReminders?: boolean;
+
+    @IsOptional()
+    @Transform(({ value }) => value === 'true' || value === true)
+    @IsBoolean()
+    removeProfileImage?: boolean;
 }

@@ -533,6 +533,98 @@ export class TimesheetService {
         return timesheet;
     }
 
+    /**
+     * Approve every pending (SUBMITTED) timesheet on a job in one action —
+     * the "Approve All" button on the project's workers screen.
+     *
+     * Timesheets are approved individually rather than with a bulk updateMany so
+     * that each one still gets its approvedAt stamp and so a single bad row
+     * cannot silently take down the rest: whatever can be approved is approved,
+     * and anything that failed is reported back.
+     *
+     * Pass weekNumber to limit the action to one week; omit it to approve every
+     * pending week on the job.
+     */
+    async approveAllTimesheetsForJob(
+        jobId: string,
+        companyId: string,
+        weekNumber?: number,
+    ): Promise<{
+        approved: TimesheetDocument[];
+        failed: { timesheetId: string; reason: string }[];
+        affectedWeeks: { jobId: string; weekNumber: number }[];
+    }> {
+        const job = await this.jobModel.findById(jobId);
+        if (!job) {
+            throw new HttpException('Job not found', HttpStatus.NOT_FOUND);
+        }
+
+        if (job.company.toString() !== companyId) {
+            throw new HttpException(
+                'You do not have permission to approve timesheets for this job',
+                HttpStatus.FORBIDDEN,
+            );
+        }
+
+        const filter: any = {
+            job: new Types.ObjectId(jobId),
+            company: new Types.ObjectId(companyId),
+            status: TimesheetStatus.SUBMITTED,
+        };
+        if (weekNumber !== undefined) filter.weekNumber = weekNumber;
+
+        const pending = await this.timesheetModel.find(filter);
+
+        if (pending.length === 0) {
+            throw new HttpException(
+                'There are no pending timesheets to approve for this job',
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+
+        const now = new Date();
+        const approved: TimesheetDocument[] = [];
+        const failed: { timesheetId: string; reason: string }[] = [];
+
+        for (const timesheet of pending) {
+            try {
+                timesheet.status = TimesheetStatus.APPROVED;
+                timesheet.approvedAt = now;
+                await timesheet.save();
+                approved.push(timesheet);
+            } catch (err) {
+                failed.push({
+                    timesheetId: (timesheet as any)._id.toString(),
+                    reason: err?.message ?? 'Unknown error',
+                });
+                this.logger.error(
+                    `Bulk approve failed for timesheet ${(timesheet as any)._id}: ${err?.message}`,
+                );
+            }
+        }
+
+        // Deduplicate job+week so the caller triggers invoice generation once per
+        // week rather than once per approved timesheet.
+        const weekKeys = new Map<string, { jobId: string; weekNumber: number }>();
+        for (const timesheet of approved) {
+            const key = `${timesheet.job.toString()}_${timesheet.weekNumber}`;
+            if (!weekKeys.has(key)) {
+                weekKeys.set(key, {
+                    jobId: timesheet.job.toString(),
+                    weekNumber: timesheet.weekNumber,
+                });
+            }
+        }
+
+        this.logger.log(
+            `Bulk approved ${approved.length}/${pending.length} timesheet(s) for job ${jobId}` +
+            (weekNumber !== undefined ? ` week ${weekNumber}` : '') +
+            (failed.length ? ` (${failed.length} failed)` : ''),
+        );
+
+        return { approved, failed, affectedWeeks: [...weekKeys.values()] };
+    }
+
     // ─────────────────────────────────────────────────────────────
     // SCHEDULER OPERATIONS
     // ─────────────────────────────────────────────────────────────

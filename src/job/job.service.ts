@@ -2,6 +2,8 @@ import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Job, JobDocument, Status } from './schema/job.schema';
+import { SavedJob, SavedJobDocument } from './schema/saved-job.schema';
+import { SaveJobDto } from './dto/save-job.dto';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { S3UploadService } from '../common/service/s3-upload.service';
@@ -20,6 +22,7 @@ export class JobService {
     @InjectModel(Offer.name) private offerModel: Model<OfferDocument>,
     @InjectModel(JobApplication.name) private applicationModel: Model<JobApplicationDocument>,
     @InjectModel(Compliance.name) private complianceModel: Model<ComplianceDocument>,
+    @InjectModel(SavedJob.name) private savedJobModel: Model<SavedJobDocument>,
     private s3UploadService: S3UploadService,
     private complianceService: ComplianceService,
   ) { }
@@ -69,6 +72,207 @@ export class JobService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // SAVED JOBS (job templates — the "Save for Later" action)
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * Upload any attached files once and return the URLs to store on a template.
+   */
+  private async resolveTemplateDocuments(
+    dto: SaveJobDto,
+    files?: Express.Multer.File[],
+  ): Promise<string[] | undefined> {
+    if (files && files.length > 0) {
+      return this.s3UploadService.uploadMultipleFiles(files, 'jobs/documents');
+    }
+    return dto.documents;
+  }
+
+  /**
+   * Map the DTO onto template fields, skipping anything the client omitted so a
+   * partial update never blanks a field that was already filled in.
+   */
+  private buildTemplatePatch(dto: SaveJobDto, documentUrls?: string[]): Record<string, any> {
+    const patch: Record<string, any> = {};
+
+    if (dto.jobTitle !== undefined) patch.jobTitle = dto.jobTitle;
+    if (dto.trade !== undefined) patch.trade = dto.trade;
+    if (dto.description !== undefined) patch.description = dto.description;
+    if (dto.siteAddress !== undefined) patch.siteAddress = dto.siteAddress;
+    if (dto.timelineStartDate !== undefined) {
+      patch.timelineStartDate = new Date(dto.timelineStartDate);
+    }
+    if (dto.timelineEndDate !== undefined) {
+      patch.timelineEndDate = new Date(dto.timelineEndDate);
+    }
+    if (dto.hourlyRate !== undefined) patch.hourlyRate = dto.hourlyRate;
+    if (dto.workersRequired !== undefined) patch.workersRequired = dto.workersRequired;
+    if (documentUrls !== undefined) patch.projectDocuments = documentUrls;
+
+    return patch;
+  }
+
+  async createSavedJob(
+    dto: SaveJobDto,
+    companyId: string,
+    files?: Express.Multer.File[],
+  ): Promise<SavedJobDocument> {
+    const documentUrls = await this.resolveTemplateDocuments(dto, files);
+
+    const savedJob = new this.savedJobModel({
+      company: new Types.ObjectId(companyId),
+      ...this.buildTemplatePatch(dto, documentUrls ?? []),
+    });
+
+    return savedJob.save();
+  }
+
+  async getSavedJobsByCompany(companyId: string): Promise<SavedJobDocument[]> {
+    return this.savedJobModel
+      .find({ company: new Types.ObjectId(companyId) })
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
+  /**
+   * One template, for re-opening the Post New Job form pre-filled.
+   */
+  async getSavedJobById(
+    savedJobId: string,
+    companyId: string,
+  ): Promise<SavedJobDocument> {
+    const savedJob = await this.savedJobModel.findById(savedJobId);
+
+    if (!savedJob) {
+      throw new HttpException('Saved job not found', HttpStatus.NOT_FOUND);
+    }
+    if (savedJob.company.toString() !== companyId) {
+      throw new HttpException(
+        'You do not have permission to view this saved job',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    return savedJob;
+  }
+
+  async updateSavedJob(
+    savedJobId: string,
+    dto: SaveJobDto,
+    companyId: string,
+    files?: Express.Multer.File[],
+  ): Promise<SavedJobDocument> {
+    // Ownership check before touching anything.
+    await this.getSavedJobById(savedJobId, companyId);
+
+    const documentUrls = await this.resolveTemplateDocuments(dto, files);
+    const patch = this.buildTemplatePatch(dto, documentUrls);
+
+    const updated = await this.savedJobModel
+      .findByIdAndUpdate(savedJobId, { $set: patch }, { new: true })
+      .exec();
+
+    if (!updated) {
+      throw new HttpException('Saved job not found', HttpStatus.NOT_FOUND);
+    }
+
+    return updated;
+  }
+
+  async deleteSavedJob(savedJobId: string, companyId: string): Promise<void> {
+    await this.getSavedJobById(savedJobId, companyId);
+    await this.savedJobModel.findByIdAndDelete(savedJobId).exec();
+  }
+
+  /**
+   * Publish a template as a real job.
+   *
+   * The template is a reusable blueprint, so it SURVIVES publishing — only its
+   * usage counters are bumped. Fields the client sends override the stored ones,
+   * which is what lets the user open the pre-filled form, tweak it, and publish
+   * without first saving the edit back to the template.
+   */
+  async publishSavedJob(
+    savedJobId: string,
+    companyId: string,
+    overrides?: SaveJobDto,
+    files?: Express.Multer.File[],
+  ): Promise<{ job: JobDocument; savedJob: SavedJobDocument }> {
+    const savedJob = await this.getSavedJobById(savedJobId, companyId);
+
+    const documentUrls = await this.resolveTemplateDocuments(overrides ?? {}, files);
+
+    // Stored template values, with any client overrides applied on top.
+    const merged = {
+      jobTitle: overrides?.jobTitle ?? savedJob.jobTitle,
+      trade: overrides?.trade ?? savedJob.trade,
+      description: overrides?.description ?? savedJob.description,
+      siteAddress: overrides?.siteAddress ?? savedJob.siteAddress,
+      timelineStartDate: overrides?.timelineStartDate
+        ? new Date(overrides.timelineStartDate)
+        : savedJob.timelineStartDate,
+      timelineEndDate: overrides?.timelineEndDate
+        ? new Date(overrides.timelineEndDate)
+        : savedJob.timelineEndDate,
+      hourlyRate: overrides?.hourlyRate ?? savedJob.hourlyRate,
+      workersRequired: overrides?.workersRequired ?? savedJob.workersRequired ?? 1,
+      // Documents uploaded on the template carry over so the user does not
+      // re-attach them at publish time.
+      projectDocuments: documentUrls ?? savedJob.projectDocuments ?? [],
+    };
+
+    // Job requires all of these; a template is allowed to be incomplete, so the
+    // check belongs here rather than in the DTO. Report every gap at once so the
+    // form can highlight all missing fields in one pass.
+    const missing = [
+      'jobTitle',
+      'trade',
+      'description',
+      'siteAddress',
+      'timelineStartDate',
+      'timelineEndDate',
+      'hourlyRate',
+    ].filter((field) => {
+      const value = (merged as Record<string, any>)[field];
+      return value === undefined || value === null || value === '';
+    });
+
+    if (missing.length > 0) {
+      throw new HttpException(
+        {
+          message: `This saved job is missing required fields: ${missing.join(', ')}`,
+          missingFields: missing,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const job = new this.jobModel({
+      company: new Types.ObjectId(companyId),
+      typeOfJob: 'request',
+      ...merged,
+    });
+
+    const publishedJob = await job.save();
+
+    // Mirrors createJob: every published job gets a compliance record.
+    await this.complianceService.createCompliance(
+      merged.jobTitle as string,
+      publishedJob._id.toString(),
+    );
+
+    savedJob.lastPublishedAt = new Date();
+    savedJob.timesPublished = (savedJob.timesPublished ?? 0) + 1;
+    await savedJob.save();
+
+    this.logger.log(
+      `Published job ${publishedJob._id} from saved job ${savedJobId} (company ${companyId})`,
+    );
+
+    return { job: publishedJob, savedJob };
   }
 
   async getJobsByCompany(companyId: string): Promise<JobDocument[]> {

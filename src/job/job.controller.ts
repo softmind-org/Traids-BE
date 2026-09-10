@@ -17,6 +17,7 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JobService } from './job.service';
 import { CreateJobDto } from './dto/create-job.dto';
+import { SaveJobDto } from './dto/save-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { FilterJobsDto } from './dto/filter-jobs.dto';
 import { SearchJobsDto } from './dto/search-jobs.dto';
@@ -59,12 +60,150 @@ export class JobController {
   @Get()
   @UseGuards(JwtAuthGuard, AdminGuard)
   async getMyJobs(@Request() req) {
-    const jobs = await this.jobService.getJobsByCompany(req.user.sub);
+    const [jobs, savedJobs] = await Promise.all([
+      this.jobService.getJobsByCompany(req.user.sub),
+      this.jobService.getSavedJobsByCompany(req.user.sub),
+    ]);
 
+    // savedJobs feeds the "Saved Jobs" tab. Returned from the same call as the
+    // live jobs so My Jobs renders every tab count without a second request.
     return {
       message: 'Jobs retrieved successfully',
       count: jobs.length,
       data: jobs,
+      savedJobs,
+      savedJobsCount: savedJobs.length,
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // SAVED JOBS ("Save for Later" templates)
+  // Declared before @Get(':id') so "saved" is not matched as a job id.
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * POST /jobs/saved
+   * Save the Post New Job form for later. Every field is optional.
+   */
+  @Post('saved')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FilesInterceptor('documents', 10))
+  async createSavedJob(
+    @Body() saveJobDto: SaveJobDto,
+    @Request() req,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    const savedJob = await this.jobService.createSavedJob(
+      saveJobDto,
+      req.user.sub,
+      files,
+    );
+
+    return {
+      message: 'Job saved successfully',
+      data: savedJob,
+    };
+  }
+
+  /**
+   * GET /jobs/saved
+   * The Saved Jobs tab.
+   */
+  @Get('saved')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async getSavedJobs(@Request() req) {
+    const savedJobs = await this.jobService.getSavedJobsByCompany(req.user.sub);
+
+    return {
+      message: 'Saved jobs retrieved successfully',
+      count: savedJobs.length,
+      data: savedJobs,
+    };
+  }
+
+  /**
+   * GET /jobs/saved/:id
+   * One saved job, to re-open the Post New Job form pre-filled.
+   */
+  @Get('saved/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async getSavedJobById(@Param('id') id: string, @Request() req) {
+    const savedJob = await this.jobService.getSavedJobById(id, req.user.sub);
+
+    return {
+      message: 'Saved job retrieved successfully',
+      data: savedJob,
+    };
+  }
+
+  /**
+   * PATCH /jobs/saved/:id
+   * Save changes back onto an existing saved job. Omitted fields are left as-is.
+   */
+  @Patch('saved/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseInterceptors(FilesInterceptor('documents', 10))
+  async updateSavedJob(
+    @Param('id') id: string,
+    @Body() saveJobDto: SaveJobDto,
+    @Request() req,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    const savedJob = await this.jobService.updateSavedJob(
+      id,
+      saveJobDto,
+      req.user.sub,
+      files,
+    );
+
+    return {
+      message: 'Saved job updated successfully',
+      data: savedJob,
+    };
+  }
+
+  /**
+   * DELETE /jobs/saved/:id
+   */
+  @Delete('saved/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async deleteSavedJob(@Param('id') id: string, @Request() req) {
+    await this.jobService.deleteSavedJob(id, req.user.sub);
+
+    return {
+      message: 'Saved job deleted successfully',
+    };
+  }
+
+  /**
+   * POST /jobs/saved/:id/publish
+   * Publish a saved job as a live job. The saved job is a reusable template, so
+   * it remains in the Saved Jobs tab afterwards. Any fields sent in the body
+   * override the stored ones, so the user can tweak the pre-filled form and
+   * publish without saving the edit back first.
+   */
+  @Post('saved/:id/publish')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FilesInterceptor('documents', 10))
+  async publishSavedJob(
+    @Param('id') id: string,
+    @Body() overrides: SaveJobDto,
+    @Request() req,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    const { job, savedJob } = await this.jobService.publishSavedJob(
+      id,
+      req.user.sub,
+      overrides,
+      files,
+    );
+
+    return {
+      message: 'Job published successfully',
+      data: job,
+      savedJob,
     };
   }
 

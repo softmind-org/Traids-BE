@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { jwtModuleOptions } from '../common/constants/jwt.constants';
 import { Job, JobSchema } from './schema/job.schema';
+import { SavedJob, SavedJobSchema } from './schema/saved-job.schema';
 import { Offer, OfferSchema } from '../offer/schema/offer.schema';
 import { JobApplication, JobApplicationSchema } from '../job-application/schema/job-application.schema';
 import { Compliance, ComplianceSchema } from '../compliance/schema/compliance.schema';
@@ -19,6 +20,7 @@ import { RatingModule } from '../rating/rating.module';
   imports: [
     MongooseModule.forFeature([
       { name: Job.name, schema: JobSchema },
+      { name: SavedJob.name, schema: SavedJobSchema },
       { name: Offer.name, schema: OfferSchema },
       { name: JobApplication.name, schema: JobApplicationSchema },
       { name: Compliance.name, schema: ComplianceSchema },

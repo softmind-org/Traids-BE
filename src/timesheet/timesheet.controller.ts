@@ -9,6 +9,7 @@ import {
     HttpCode,
     Param,
     Query,
+    Logger,
 } from '@nestjs/common';
 import { TimesheetService } from './timesheet.service';
 import { InvoiceService } from '../invoice/invoice.service';
@@ -20,6 +21,8 @@ import { TimesheetStatus } from './schema/timesheet.schema';
 
 @Controller('timesheets')
 export class TimesheetController {
+    private readonly logger = new Logger(TimesheetController.name);
+
     constructor(
         private readonly timesheetService: TimesheetService,
         private readonly invoiceService: InvoiceService,
@@ -180,6 +183,64 @@ export class TimesheetController {
                 status: invoice.status,
                 message: 'Invoice auto-generated for this week',
             } : null,
+        };
+    }
+
+    /**
+     * POST /timesheets/company/job/:jobId/approve-all
+     * Approve every pending timesheet on a job in one action ("Approve All").
+     * Optional query param: ?weekNumber=N to limit it to a single week.
+     *
+     * Invoices are generated once per affected week, matching the behaviour of
+     * approving each timesheet individually.
+     */
+    @Post('company/job/:jobId/approve-all')
+    @UseGuards(JwtAuthGuard, AdminGuard)
+    @HttpCode(HttpStatus.OK)
+    async approveAllTimesheets(
+        @Param('jobId') jobId: string,
+        @Query('weekNumber') weekNumber: string,
+        @Request() req,
+    ) {
+        const { approved, failed, affectedWeeks } =
+            await this.timesheetService.approveAllTimesheetsForJob(
+                jobId,
+                req.user.sub,
+                weekNumber ? parseInt(weekNumber, 10) : undefined,
+            );
+
+        // One invoice attempt per affected week. A failure here must not undo the
+        // approvals, so each is caught and reported rather than thrown.
+        const invoices: any[] = [];
+        for (const week of affectedWeeks) {
+            try {
+                const invoice = await this.invoiceService.maybeGenerateInvoice(
+                    week.jobId,
+                    week.weekNumber,
+                );
+                if (invoice) {
+                    invoices.push({
+                        weekNumber: week.weekNumber,
+                        invoiceNumber: invoice.invoiceNumber,
+                        totalAmount: invoice.totalAmount,
+                        status: invoice.status,
+                    });
+                }
+            } catch (err) {
+                this.logger.error(
+                    `Invoice generation failed for job ${week.jobId} week ${week.weekNumber}: ${err.message}`,
+                );
+            }
+        }
+
+        return {
+            success: true,
+            message: `${approved.length} timesheet(s) approved successfully`,
+            approvedCount: approved.length,
+            failedCount: failed.length,
+            data: approved,
+            failed,
+            invoices,
         };
     }
 }

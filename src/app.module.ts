@@ -21,6 +21,7 @@ import { HmrcModule } from './hmrc/hmrc.module';
 import { CisModule } from './cis/cis.module';
 import { RatingModule } from './rating/rating.module';
 import { AdminModule } from './admin/admin.module';
+import { PortfolioModule } from './portfolio/portfolio.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { AdminModule } from './admin/admin.module';
     InvoiceModule,
     HmrcModule,
     CisModule,
+    PortfolioModule,
     RatingModule,
     AdminModule,
   ],

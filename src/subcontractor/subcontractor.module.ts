@@ -17,6 +17,8 @@ import { JobModule } from '../job/job.module';
 import { OfferModule } from '../offer/offer.module';
 import { StripeModule } from '../stripe/stripe.module';
 import { HmrcModule } from '../hmrc/hmrc.module';
+import { PortfolioModule } from '../portfolio/portfolio.module';
+import { RatingModule } from '../rating/rating.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { HmrcModule } from '../hmrc/hmrc.module';
     OfferModule,
     StripeModule,
     HmrcModule,
+    PortfolioModule,
+    RatingModule,
   ],
   controllers: [SubcontractorController, CompanySubcontractorController],
   providers: [SubcontractorService, CompanySubcontractorService],

@@ -445,7 +445,14 @@ export class SubcontractorService {
           hourlyRate: li.hourlyRate,
           grossAmount: li.grossAmount,
           platformFee: li.platformFee,
-          netPayable: li.netPayable,
+          cisDeductionRate: li.cisDeductionRate,
+          cisDeduction: li.cisDeduction ?? 0,
+          // What the subcontractor actually received: gross minus CIS. The
+          // stored line-item netPayable is the company-side total (it adds the
+          // platform fee the company pays), so it must not be shown here.
+          netPayable: parseFloat(
+            (li.grossAmount - (li.cisDeduction ?? 0)).toFixed(2),
+          ),
         }));
     });
 
@@ -490,7 +497,9 @@ export class SubcontractorService {
   }> {
     const subObjId = new Types.ObjectId(subcontractorId);
 
-    // 1. Total earnings — sum of netPayable from paid invoice line items
+    // 1. Total earnings — what was actually paid out: gross minus CIS for each
+    // paid line item. Not lineItems.netPayable, which is the company-side total
+    // and includes the platform fee the company pays.
     const earningsResult = await this.invoiceModel.aggregate([
       { $unwind: '$lineItems' },
       {
@@ -502,7 +511,14 @@ export class SubcontractorService {
       {
         $group: {
           _id: null,
-          total: { $sum: '$lineItems.netPayable' },
+          total: {
+            $sum: {
+              $subtract: [
+                '$lineItems.grossAmount',
+                { $ifNull: ['$lineItems.cisDeduction', 0] },
+              ],
+            },
+          },
         },
       },
     ]);

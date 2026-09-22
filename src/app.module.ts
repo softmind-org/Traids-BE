@@ -22,6 +22,8 @@ import { CisModule } from './cis/cis.module';
 import { RatingModule } from './rating/rating.module';
 import { AdminModule } from './admin/admin.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
+import { AssistantModule } from './assistant/assistant.module';
+import { BioAnalyserModule } from './bio-analyser/bio-analyser.module';
 
 @Module({
   imports: [
@@ -55,6 +57,8 @@ import { PortfolioModule } from './portfolio/portfolio.module';
     HmrcModule,
     CisModule,
     PortfolioModule,
+    AssistantModule,
+    BioAnalyserModule,
     RatingModule,
     AdminModule,
   ],

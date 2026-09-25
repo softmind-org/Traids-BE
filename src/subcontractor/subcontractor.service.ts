@@ -13,7 +13,6 @@ import { S3UploadService } from '../common/service/s3-upload.service';
 import { OpenAiService } from '../common/service/openai.service';
 import { StripeService } from '../stripe/stripe.service';
 import * as bcrypt from 'bcrypt';
-import { PushService } from '../push/push.service';
 
 @Injectable()
 export class SubcontractorService {
@@ -34,7 +33,6 @@ export class SubcontractorService {
     private s3UploadService: S3UploadService,
     private openAiService: OpenAiService,
     private stripeService: StripeService,
-    private pushService: PushService,
   ) { }
 
   async validate(fields: { email?: string }): Promise<Record<string, { valid: boolean; message?: string }>> {
@@ -165,13 +163,6 @@ export class SubcontractorService {
       primaryTrade: saved.primaryTrade,
       userType: 'subcontractor',
     });
-
-    // The mobile app can send its FCM token at signup, since signup logs in.
-    await this.pushService.registerToken(
-      saved._id.toString(),
-      'subcontractor',
-      signUpSubcontractorDto.fcmToken,
-    );
 
     return { user: subcontractor, accessToken, userType: 'subcontractor' };
   }

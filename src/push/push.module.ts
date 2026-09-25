@@ -1,11 +1,14 @@
 import { Global, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { JwtModule } from '@nestjs/jwt';
+import { jwtModuleOptions } from '../common/constants/jwt.constants';
 import { Company, CompanySchema } from '../company/schema/company.schema';
 import {
   Subcontractor,
   SubcontractorSchema,
 } from '../subcontractor/schema/subcontractor.schema';
 import { firebaseProvider } from './firebase.provider';
+import { PushController } from './push.controller';
 import { PushService } from './push.service';
 
 /**
@@ -19,7 +22,10 @@ import { PushService } from './push.service';
       { name: Company.name, schema: CompanySchema },
       { name: Subcontractor.name, schema: SubcontractorSchema },
     ]),
+    // JwtAuthGuard on PushController needs JwtService.
+    JwtModule.register(jwtModuleOptions),
   ],
+  controllers: [PushController],
   providers: [firebaseProvider, PushService],
   exports: [PushService],
 })

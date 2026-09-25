@@ -12,7 +12,6 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyResetTokenDto } from './dto/verify-reset-token.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { EmailService } from '../common/service/email.service';
-import { PushService } from '../push/push.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -23,7 +22,6 @@ export class AuthService {
     private subcontractorModel: Model<SubcontractorDocument>,
     private jwtService: JwtService,
     private emailService: EmailService,
-    private pushService: PushService,
   ) { }
 
   async login(loginDto: LoginDto): Promise<{
@@ -31,24 +29,12 @@ export class AuthService {
     accessToken: string;
     userType: string;
   }> {
-    if (loginDto.userType !== 'company' && loginDto.userType !== 'subcontractor') {
-      throw new HttpException('Invalid user type', HttpStatus.BAD_REQUEST);
+    if (loginDto.userType === 'company') {
+      return this.loginCompany(loginDto.email, loginDto.password);
+    } else if (loginDto.userType === 'subcontractor') {
+      return this.loginSubcontractor(loginDto.email, loginDto.password);
     }
-
-    const result =
-      loginDto.userType === 'company'
-        ? await this.loginCompany(loginDto.email, loginDto.password)
-        : await this.loginSubcontractor(loginDto.email, loginDto.password);
-
-    // The mobile app sends its FCM token on every login. Registering after a
-    // successful login keeps a failed attempt from touching device tokens.
-    await this.pushService.registerToken(
-      result.user._id.toString(),
-      loginDto.userType,
-      loginDto.fcmToken,
-    );
-
-    return result;
+    throw new HttpException('Invalid user type', HttpStatus.BAD_REQUEST);
   }
 
   private async loginCompany(

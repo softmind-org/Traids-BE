@@ -14,6 +14,7 @@ const SENSITIVE_FIELDS = [
   'password', 'resetToken', 'resetTokenExpires',
   'stripeAccountId',
   'hmrcAccessToken', 'hmrcRefreshToken', 'hmrcTokenExpiry',
+  'fcmTokens',
 ];
 
 @Schema({
@@ -120,6 +121,12 @@ export class Subcontractor {
 
   @Prop()
   hmrcTokenExpiry?: Date;
+
+  // Push notifications
+  // `select: false` keeps device tokens out of every query by default;
+  // PushService opts in with .select('+fcmTokens').
+  @Prop({ type: [String], default: [], select: false })
+  fcmTokens: string[];
 }
 
 export const SubcontractorSchema = SchemaFactory.createForClass(Subcontractor);

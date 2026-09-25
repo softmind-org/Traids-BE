@@ -11,6 +11,7 @@ import { SignUpCompanyDto } from './dto/signup-company.dto';
 import { S3UploadService } from '../common/service/s3-upload.service';
 import { StripeService } from '../stripe/stripe.service';
 import * as bcrypt from 'bcrypt';
+import { PushService } from '../push/push.service';
 
 @Injectable()
 export class CompanyService {
@@ -23,6 +24,7 @@ export class CompanyService {
     private jwtService: JwtService,
     private s3UploadService: S3UploadService,
     private stripeService: StripeService,
+    private pushService: PushService,
   ) { }
 
   async validate(fields: { workEmail?: string; registrationNumber?: string; phoneNumber?: string }): Promise<Record<string, { valid: boolean; message?: string }>> {
@@ -131,6 +133,13 @@ export class CompanyService {
       companyName: saved.companyName,
       userType: 'company',
     });
+
+    // The mobile app can send its FCM token at signup, since signup logs in.
+    await this.pushService.registerToken(
+      saved._id.toString(),
+      'company',
+      signUpCompanyDto.fcmToken,
+    );
 
     return { user: company, accessToken, userType: 'company' };
   }

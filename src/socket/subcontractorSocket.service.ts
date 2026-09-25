@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SocketGateway } from './socket.gateway';
 import { NotificationService } from '../notification/notification.service';
+import { PushService } from '../push/push.service';
 
 @Injectable()
 export class SubcontractorSocketService {
@@ -9,6 +10,7 @@ export class SubcontractorSocketService {
     constructor(
         private socketGateway: SocketGateway,
         private notificationService: NotificationService,
+        private pushService: PushService,
     ) { }
 
     /**
@@ -46,6 +48,18 @@ export class SubcontractorSocketService {
             relatedEntityId: applicationData.applicationId,
             relatedEntityType: 'application',
             data: { jobId: applicationData.jobId },
+        });
+
+        // Mobile push
+        await this.pushService.sendToUser(subcontractorId, 'subcontractor', {
+            type: 'applicationAccepted',
+            title: 'Application Accepted',
+            body: applicationData.message || 'Your job application has been accepted',
+            data: {
+                applicationId: applicationData.applicationId,
+                jobId: applicationData.jobId,
+                companyId: applicationData.companyId,
+            },
         });
 
         this.logger.log(`Application accepted notification sent to subcontractor ${subcontractorId}`);
@@ -86,6 +100,18 @@ export class SubcontractorSocketService {
             relatedEntityId: applicationData.applicationId,
             relatedEntityType: 'application',
             data: { jobId: applicationData.jobId },
+        });
+
+        // Mobile push
+        await this.pushService.sendToUser(subcontractorId, 'subcontractor', {
+            type: 'applicationRejected',
+            title: 'Application Rejected',
+            body: applicationData.message || 'Your job application has been rejected',
+            data: {
+                applicationId: applicationData.applicationId,
+                jobId: applicationData.jobId,
+                companyId: applicationData.companyId,
+            },
         });
 
         this.logger.log(`Application rejected notification sent to subcontractor ${subcontractorId}`);
@@ -132,6 +158,18 @@ export class SubcontractorSocketService {
             },
         });
 
+        // Mobile push
+        await this.pushService.sendToUser(subcontractorId, 'subcontractor', {
+            type: 'offerReceived',
+            title: 'New Job Offer',
+            body: `${offerData.companyName} sent you an offer for ${offerData.jobTitle}`,
+            data: {
+                offerId: offerData.offerId,
+                companyId: offerData.companyId,
+                hourlyRate: offerData.hourlyRate,
+            },
+        });
+
         this.logger.log(`Offer received notification sent to subcontractor ${subcontractorId}`);
     }
 
@@ -173,20 +211,32 @@ export class SubcontractorSocketService {
             data: { conversationId: messageData.conversationId },
         });
 
+        // Mobile push
+        await this.pushService.sendToUser(subcontractorId, 'subcontractor', {
+            type: 'newMessage',
+            title: messageData.senderName,
+            body: messageData.preview,
+            data: {
+                conversationId: messageData.conversationId,
+                senderId: messageData.senderId,
+                messageId: messageData.messageId,
+            },
+        });
+
         this.logger.log(`New message notification sent to subcontractor ${subcontractorId}`);
     }
 
     /**
      * Notify subcontractor about job assignment
      */
-    notifyJobAssigned(
+    async notifyJobAssigned(
         subcontractorId: string,
         jobData: {
             jobId: string;
             jobTitle: string;
             companyName: string;
         },
-    ): void {
+    ): Promise<void> {
         this.socketGateway.getServer()
             .to(`user:${subcontractorId}`)
             .emit('jobAssigned', {
@@ -194,6 +244,14 @@ export class SubcontractorSocketService {
                 jobTitle: jobData.jobTitle,
                 companyName: jobData.companyName,
             });
+
+        // Mobile push
+        await this.pushService.sendToUser(subcontractorId, 'subcontractor', {
+            type: 'jobAssigned',
+            title: 'Job Assigned',
+            body: `${jobData.companyName} assigned you to ${jobData.jobTitle}`,
+            data: { jobId: jobData.jobId },
+        });
 
         this.logger.log(`Job assigned notification sent to subcontractor ${subcontractorId}`);
     }

@@ -6,6 +6,10 @@ node_modules/
 .env.local
 .env.production
 
+# Firebase service account (private key — never commit)
+*firebase-adminsdk*.json
+firebase-service-account.json
+
 # Build output
 dist/
 

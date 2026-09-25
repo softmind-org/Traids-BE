@@ -114,6 +114,12 @@ export class Company {
 
   @Prop()
   hmrcTokenExpiry?: Date;           // When the access token expires
+
+  // Push notifications
+  // `select: false` keeps device tokens out of every profile/login response by
+  // default; PushService opts in with .select('+fcmTokens').
+  @Prop({ type: [String], default: [], select: false })
+  fcmTokens: string[];
 }
 
 export const CompanySchema = SchemaFactory.createForClass(Company);

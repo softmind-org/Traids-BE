@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEmail, IsNumber, IsOptional, IsArray, Min, MinLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, IsNumber, IsOptional, IsArray, Min, MinLength, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class SignUpSubcontractorDto {
@@ -79,4 +79,10 @@ export class SignUpSubcontractorDto {
   // @IsOptional()
   // @IsString()
   // nino?: string;             // National Insurance Number (e.g. PE938808A)
+
+  /** Mobile only. Signup logs the user straight in, so the device registers here too. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(4096)
+  fcmToken?: string;
 }

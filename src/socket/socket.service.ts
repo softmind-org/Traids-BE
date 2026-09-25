@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SocketGateway } from './socket.gateway';
+import { PushService } from '../push/push.service';
 
 // Define notification types for type safety
 export enum NotificationType {
@@ -35,7 +36,10 @@ export interface NotificationPayload {
 export class SocketService {
   private readonly logger = new Logger(SocketService.name);
 
-  constructor(private socketGateway: SocketGateway) { }
+  constructor(
+    private socketGateway: SocketGateway,
+    private pushService: PushService,
+  ) { }
 
   /**
    * Send notification to a specific user
@@ -47,6 +51,16 @@ export class SocketService {
     };
 
     this.socketGateway.getServer().to(`user:${userId}`).emit(notification.type, payload);
+
+    // Mobile push. Not awaited: the socket emit is the primary channel and must
+    // not wait on FCM. PushService swallows its own errors.
+    void this.pushService.sendToUserId(userId, {
+      type: notification.type,
+      title: notification.title,
+      body: notification.message,
+      data: notification.data,
+    });
+
     this.logger.log(`Notification sent to user ${userId}: ${notification.type}`);
   }
 
@@ -67,6 +81,15 @@ export class SocketService {
     };
 
     this.socketGateway.getServer().to(`type:${userType}`).emit(notification.type, payload);
+
+    // Mobile push
+    void this.pushService.sendToUserType(userType, {
+      type: notification.type,
+      title: notification.title,
+      body: notification.message,
+      data: notification.data,
+    });
+
     this.logger.log(`Notification sent to all ${userType}s: ${notification.type}`);
   }
 
@@ -93,6 +116,15 @@ export class SocketService {
     };
 
     this.socketGateway.getServer().emit(notification.type, payload);
+
+    // Mobile push
+    void this.pushService.broadcast({
+      type: notification.type,
+      title: notification.title,
+      body: notification.message,
+      data: notification.data,
+    });
+
     this.logger.log(`Broadcast notification: ${notification.type}`);
   }
 

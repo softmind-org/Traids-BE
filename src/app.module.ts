@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { JobModule } from './job/job.module';
 import { OfferModule } from './offer/offer.module';
 import { SocketModule } from './socket/socket.module';
+import { PushModule } from './push/push.module';
 import { Logger } from '@nestjs/common';
 import { ChatModule } from './chat/chat.module';
 import { JobApplicationModule } from './job-application/job-application.module';
@@ -41,6 +42,7 @@ import { BioAnalyserModule } from './bio-analyser/bio-analyser.module';
         return connection;
       },
     }),
+    PushModule,
     SocketModule,
     CompanyModule,
     SubcontractorModule,

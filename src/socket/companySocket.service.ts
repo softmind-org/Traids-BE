@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SocketGateway } from './socket.gateway';
 import { NotificationService } from '../notification/notification.service';
+import { PushService } from '../push/push.service';
 
 @Injectable()
 export class CompanySocketService {
@@ -9,6 +10,7 @@ export class CompanySocketService {
     constructor(
         private socketGateway: SocketGateway,
         private notificationService: NotificationService,
+        private pushService: PushService,
     ) { }
 
     /**
@@ -52,6 +54,18 @@ export class CompanySocketService {
             },
         });
 
+        // Mobile push
+        await this.pushService.sendToUser(companyId, 'company', {
+            type: 'newJobApplication',
+            title: 'New Job Application',
+            body: `${applicationData.subcontractorName} applied for your job`,
+            data: {
+                applicationId: applicationData.applicationId,
+                jobId: applicationData.jobId,
+                subcontractorId: applicationData.subcontractorId,
+            },
+        });
+
         this.logger.log(`New job application notification sent to company ${companyId}`);
     }
 
@@ -91,6 +105,17 @@ export class CompanySocketService {
             data: { jobTitle: offerData.jobTitle },
         });
 
+        // Mobile push
+        await this.pushService.sendToUser(companyId, 'company', {
+            type: 'offerAccepted',
+            title: 'Offer Accepted',
+            body: `${offerData.subcontractorName} accepted your offer for ${offerData.jobTitle}`,
+            data: {
+                offerId: offerData.offerId,
+                subcontractorId: offerData.subcontractorId,
+            },
+        });
+
         this.logger.log(`Offer accepted notification sent to company ${companyId}`);
     }
 
@@ -128,6 +153,17 @@ export class CompanySocketService {
             relatedEntityId: offerData.offerId,
             relatedEntityType: 'offer',
             data: { jobTitle: offerData.jobTitle },
+        });
+
+        // Mobile push
+        await this.pushService.sendToUser(companyId, 'company', {
+            type: 'offerRejected',
+            title: 'Offer Rejected',
+            body: `${offerData.subcontractorName} rejected your offer for ${offerData.jobTitle}`,
+            data: {
+                offerId: offerData.offerId,
+                subcontractorId: offerData.subcontractorId,
+            },
         });
 
         this.logger.log(`Offer rejected notification sent to company ${companyId}`);
@@ -171,20 +207,32 @@ export class CompanySocketService {
             data: { conversationId: messageData.conversationId },
         });
 
+        // Mobile push
+        await this.pushService.sendToUser(companyId, 'company', {
+            type: 'newMessage',
+            title: messageData.senderName,
+            body: messageData.preview,
+            data: {
+                conversationId: messageData.conversationId,
+                senderId: messageData.senderId,
+                messageId: messageData.messageId,
+            },
+        });
+
         this.logger.log(`New message notification sent to company ${companyId}`);
     }
 
     /**
      * Notify company about job status update
      */
-    notifyJobStatusUpdate(
+    async notifyJobStatusUpdate(
         companyId: string,
         jobData: {
             jobId: string;
             jobTitle: string;
             status: string;
         },
-    ): void {
+    ): Promise<void> {
         this.socketGateway.getServer()
             .to(`user:${companyId}`)
             .emit('jobStatusUpdate', {
@@ -192,6 +240,14 @@ export class CompanySocketService {
                 jobTitle: jobData.jobTitle,
                 status: jobData.status,
             });
+
+        // Mobile push
+        await this.pushService.sendToUser(companyId, 'company', {
+            type: 'jobStatusUpdate',
+            title: 'Job Status Updated',
+            body: `${jobData.jobTitle} is now ${jobData.status}`,
+            data: { jobId: jobData.jobId, status: jobData.status },
+        });
 
         this.logger.log(`Job status update notification sent to company ${companyId}`);
     }

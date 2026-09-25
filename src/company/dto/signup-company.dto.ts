@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEmail, IsOptional, IsArray, MinLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, IsOptional, IsArray, MinLength, MaxLength } from 'class-validator';
 
 export class SignUpCompanyDto {
   @IsString()
@@ -50,4 +50,10 @@ export class SignUpCompanyDto {
   @IsOptional()
   @IsString()
   healthAndSafetyPolicy?: string;
+
+  /** Mobile only. Signup logs the user straight in, so the device registers here too. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(4096)
+  fcmToken?: string;
 }

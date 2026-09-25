@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, IsIn, IsOptional, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, IsIn } from 'class-validator';
 
 export class LoginDto {
   @IsEmail()
@@ -13,11 +13,4 @@ export class LoginDto {
   @IsNotEmpty()
   @IsIn(['company', 'subcontractor'])
   userType: 'company' | 'subcontractor';
-
-  /** Mobile only. Sent on every login; stored if it isn't already on the user. */
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(4096)
-  fcmToken?: string;
 }
